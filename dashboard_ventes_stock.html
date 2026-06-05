@@ -275,6 +275,43 @@
   <div id="content">
     <div class="loading"><div class="spinner"></div><span>Chargement des données…</span></div>
   </div>
+  <!-- ═══ SECTION TRANSFERTS INTER-MAGASINS ═══ -->
+  <div style="margin:32px 0 16px;border-top:2px solid var(--border);padding-top:28px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <div style="width:4px;height:32px;background:var(--green-dark);border-radius:2px"></div>
+      <div>
+        <div style="font-size:18px;font-weight:800;color:var(--text)">🔄 Transferts Inter-Magasins</div>
+        <div style="font-size:12px;color:var(--text-light);margin-top:2px">Flux de produits entre magasins sur la période sélectionnée</div>
+      </div>
+    </div>
+
+    <div id="transferts-kpis" class="kpi-grid" style="margin-bottom:24px"></div>
+
+    <div class="charts-row" style="margin-bottom:24px">
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:#52B788"></span>Balance Donné / Reçu par magasin</div>
+        <div class="card-subtitle">Flux nets sur la période</div>
+        <div class="chart-wrap"><canvas id="chartBalance" height="140"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:#E76F51"></span>Matrice flux inter-magasins</div>
+        <div class="card-subtitle">Qui donne à qui — quantités totales</div>
+        <div id="transferts-matrice" class="table-wrap"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-title"><span class="dot" style="background:#F9C74F"></span>Top produits transférés</div>
+      <div class="card-subtitle">Produits les plus échangés entre magasins</div>
+      <div id="transferts-produits" class="table-wrap"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-title"><span class="dot" style="background:#8B5CF6"></span>Détail des transferts</div>
+      <div class="card-subtitle">Liste complète sur la période filtrée</div>
+      <div id="transferts-detail" class="table-wrap"></div>
+    </div>
+  </div>
 </main>
 
 <footer>La Petite Pause © 2026 — Dashboard mis à jour automatiquement depuis Google Sheets</footer>
@@ -384,6 +421,7 @@ async function loadData() {
     if (savedDateEnd)   document.getElementById('filter-date-end').value   = savedDateEnd;
 
     applyFilters();
+    loadTransferts();
     document.getElementById('last-update').textContent = 'Mis à jour : ' + new Date().toLocaleTimeString('fr-FR');
   } catch(e) {
     if (rawData.length === 0) {
@@ -617,6 +655,7 @@ function applyFilters() {
   });
 
   renderDashboard(data);
+  renderTransferts();
   updateActiveFiltersBar();
 }
 
@@ -926,6 +965,159 @@ function kpiCard(icon, label, value, sub, type) {
 
 function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ── Transferts ────────────────────────────────────────────────
+const MAG_COLORS_TR = {
+  'Lingolsheim':  '#3B5998', 'Strasbourg':   '#E84393',
+  'Eckbolsheim':  '#FF8C00', 'Schiltigheim': '#28A745', 'Illkirch': '#8B5CF6'
+};
+let transfertsData = [];
+
+async function loadTransferts() {
+  try {
+    const url = APPS_SCRIPT_URL + '?type=transferts&t=' + Date.now();
+    const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) return;
+    const j = await res.json();
+    if (j.status === 'ok') { transfertsData = j.data; renderTransferts(); }
+  } catch(e) {
+    console.warn('Transferts non disponibles:', e.message);
+    document.getElementById('transferts-kpis').innerHTML =
+      '<p style="color:#888;font-size:13px;padding:8px">Données transferts non disponibles — vérifiez Code.gs</p>';
+  }
+}
+
+function filterTransferts() {
+  let data = [...transfertsData];
+  const df = document.getElementById('filter-date-start')?.value;
+  const dt = document.getElementById('filter-date-end')?.value;
+  if (df) data = data.filter(r => r.date >= df);
+  if (dt) data = data.filter(r => r.date <= dt);
+  return data;
+}
+
+function renderTransferts() {
+  const data = filterTransferts();
+  renderTransfertsKPIs(data);
+  renderBalance(data);
+  renderMatrice(data);
+  renderTopProduitsTransferts(data);
+  renderDetailTransferts(data);
+}
+
+function renderTransfertsKPIs(data) {
+  const totalQte = data.reduce((s,r) => s + r.quantite, 0);
+  const nbOps    = data.filter(r => r.produit).length;
+  const donneByMag = {}, prodByQte = {};
+  data.forEach(r => {
+    donneByMag[r.emetteur] = (donneByMag[r.emetteur] || 0) + r.quantite;
+    prodByQte[r.produit]   = (prodByQte[r.produit]   || 0) + r.quantite;
+  });
+  const topDon  = Object.entries(donneByMag).sort((a,b)=>b[1]-a[1])[0];
+  const topProd = Object.entries(prodByQte).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('transferts-kpis').innerHTML = [
+    kpiCard('🔄','Unités transférées', totalQte.toLocaleString('fr-FR'),'total période','green'),
+    kpiCard('📋','Nb transferts', nbOps.toLocaleString('fr-FR'),'opérations','teal'),
+    kpiCard('📤','Magasin donneur', topDon?topDon[0]:'—', topDon?topDon[1]+' unités données':'','orange'),
+    kpiCard('🏆','Produit + échangé', topProd?topProd[0]:'—', topProd?topProd[1]+' unités':'','yellow'),
+  ].join('');
+}
+
+function renderBalance(data) {
+  const mags = ['Lingolsheim','Strasbourg','Eckbolsheim','Schiltigheim','Illkirch'];
+  const donne = {}, recu = {};
+  mags.forEach(m => { donne[m]=0; recu[m]=0; });
+  data.forEach(r => {
+    if (donne[r.emetteur]!==undefined) donne[r.emetteur] += r.quantite;
+    if (recu[r.receveur]!==undefined)  recu[r.receveur]  += r.quantite;
+  });
+  destroyChart('chartBalance');
+  charts['chartBalance'] = new Chart(document.getElementById('chartBalance'), {
+    type: 'bar',
+    data: {
+      labels: mags,
+      datasets: [
+        { label:'Donné', data:mags.map(m=>donne[m]), backgroundColor:'rgba(231,111,81,.75)', borderRadius:6, borderSkipped:false },
+        { label:'Reçu',  data:mags.map(m=>recu[m]),  backgroundColor:'rgba(82,183,136,.75)',  borderRadius:6, borderSkipped:false }
+      ]
+    },
+    options: {
+      responsive:true,
+      plugins:{ legend:{labels:{font:{size:11},usePointStyle:true}}, tooltip:{mode:'index',intersect:false} },
+      scales:{
+        y:{grid:{color:'#E8F0EC'},ticks:{font:{size:11}},beginAtZero:true},
+        x:{grid:{display:false},ticks:{font:{size:11,weight:'600'}}}
+      }
+    }
+  });
+}
+
+function renderMatrice(data) {
+  const mags = ['Lingolsheim','Strasbourg','Eckbolsheim','Schiltigheim','Illkirch'];
+  const mx = {}; mags.forEach(e=>{ mx[e]={}; mags.forEach(r=>mx[e][r]=0); });
+  data.forEach(r=>{ if(mx[r.emetteur]&&mx[r.emetteur][r.receveur]!==undefined) mx[r.emetteur][r.receveur]+=r.quantite; });
+  const maxV = Math.max(...mags.flatMap(e=>mags.map(r=>mx[e][r])),1);
+  const sh = m => m.substring(0,5)+(m.length>5?'.':'');
+  let html = `<table style="font-size:11px;width:100%"><thead><tr>
+    <th style="background:var(--green-dark);color:#fff;padding:7px 8px;text-align:left;border-radius:8px 0 0 0">↓ Émetteur / Receveur →</th>
+    ${mags.map(r=>`<th style="background:var(--green-dark);color:#fff;padding:7px 5px;text-align:center">${sh(r)}</th>`).join('')}
+    <th style="background:var(--green-dark);color:#fff;padding:7px 5px;text-align:center;border-radius:0 8px 0 0">Donné</th>
+  </tr></thead><tbody>`;
+  mags.forEach((e,i)=>{
+    const tot = mags.reduce((s,r)=>s+mx[e][r],0);
+    html+=`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:7px 8px;font-weight:600;background:${i%2?'#fff':'#f9fbf9'}">${e}</td>
+      ${mags.map(r=>{
+        const v=mx[e][r]; const op=v>0?0.15+(v/maxV)*.7:0;
+        const bg=e===r?'#f0f0f0':v>0?`rgba(45,106,79,${op})`:'transparent';
+        return `<td style="padding:7px 5px;text-align:center;background:${bg};font-weight:${v>0?700:400};color:${e===r?'#ccc':v>0?'var(--green-dark)':'#bbb'}">${v>0?v:e===r?'—':'·'}</td>`;
+      }).join('')}
+      <td style="padding:7px 5px;text-align:center;font-weight:700;color:var(--orange)">${tot>0?tot:'—'}</td>
+    </tr>`;
+  });
+  const totR = mags.map(r=>mags.reduce((s,e)=>s+mx[e][r],0));
+  html+=`<tr style="background:var(--green-pale)"><td style="padding:7px 8px;font-weight:700">Reçu</td>
+    ${totR.map(t=>`<td style="padding:7px 5px;text-align:center;font-weight:700;color:var(--green-dark)">${t>0?t:'—'}</td>`).join('')}
+    <td></td></tr></tbody></table>`;
+  document.getElementById('transferts-matrice').innerHTML = html;
+}
+
+function renderTopProduitsTransferts(data) {
+  const byP = {}; data.forEach(r=>{ byP[r.produit]=(byP[r.produit]||0)+r.quantite; });
+  const sorted = Object.entries(byP).filter(([p])=>p).sort((a,b)=>b[1]-a[1]);
+  if(!sorted.length){ document.getElementById('transferts-produits').innerHTML='<p style="color:#888;padding:12px;font-size:13px">Aucun transfert sur cette période</p>'; return; }
+  const total = sorted.reduce((s,[,v])=>s+v,0);
+  const maxQ = sorted[0][1];
+  let html=`<table><thead><tr><th>#</th><th>Produit</th><th>Quantité transférée</th><th>Part</th></tr></thead><tbody>`;
+  sorted.forEach(([p,v],i)=>{
+    const pct=(v/total*100).toFixed(1);
+    const rc=i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+    html+=`<tr><td><span class="rank-badge ${rc}">${i+1}</span></td><td><strong>${p}</strong></td>
+      <td><div class="bar-inline"><div class="bar-track"><div class="bar-fill" style="width:${(v/maxQ*100).toFixed(0)}%;background:var(--green-mid)"></div></div><strong>${v}</strong></div></td>
+      <td>${pct}%</td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('transferts-produits').innerHTML=html;
+}
+
+function renderDetailTransferts(data) {
+  if(!data.length){ document.getElementById('transferts-detail').innerHTML='<p style="color:#888;padding:12px;font-size:13px">Aucun transfert sur cette période</p>'; return; }
+  const sorted=[...data].sort((a,b)=>b.date.localeCompare(a.date));
+  let html=`<table><thead><tr><th>Date</th><th>Produit</th><th>Qté</th><th>De</th><th>Vers</th><th>Note</th></tr></thead><tbody>`;
+  sorted.forEach(r=>{
+    const df=r.date?new Date(r.date).toLocaleDateString('fr-FR'):'—';
+    const ec=MAG_COLORS_TR[r.emetteur]||'#888', rc=MAG_COLORS_TR[r.receveur]||'#888';
+    html+=`<tr>
+      <td>${df}</td><td><strong>${r.produit}</strong></td>
+      <td style="text-align:center;font-weight:700">${r.quantite}</td>
+      <td><span style="background:${ec}22;color:${ec};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600">${r.emetteur}</span></td>
+      <td><span style="background:${rc}22;color:${rc};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600">${r.receveur}</span></td>
+      <td style="font-size:11px;color:var(--text-light)">${r.note||''}</td>
+    </tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('transferts-detail').innerHTML=html;
 }
 
 initDateFilters();
