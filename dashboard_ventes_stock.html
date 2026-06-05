@@ -1011,7 +1011,7 @@ function renderTransfertsKPIs(data) {
   const nbOps    = data.filter(r => r.produit).length;
   const donneByMag = {}, prodByQte = {};
   data.forEach(r => {
-    donneByMag[r.emetteur] = (donneByMag[r.emetteur] || 0) + r.quantite;
+    donneByMag[r.donneur] = (donneByMag[r.donneur] || 0) + r.quantite;
     prodByQte[r.produit]   = (prodByQte[r.produit]   || 0) + r.quantite;
   });
   const topDon  = Object.entries(donneByMag).sort((a,b)=>b[1]-a[1])[0];
@@ -1029,7 +1029,7 @@ function renderBalance(data) {
   const donne = {}, recu = {};
   mags.forEach(m => { donne[m]=0; recu[m]=0; });
   data.forEach(r => {
-    if (donne[r.emetteur]!==undefined) donne[r.emetteur] += r.quantite;
+    if (donne[r.donneur]!==undefined) donne[r.donneur] += r.quantite;
     if (recu[r.receveur]!==undefined)  recu[r.receveur]  += r.quantite;
   });
   destroyChart('chartBalance');
@@ -1056,11 +1056,11 @@ function renderBalance(data) {
 function renderMatrice(data) {
   const mags = ['Lingolsheim','Strasbourg','Eckbolsheim','Schiltigheim','Illkirch'];
   const mx = {}; mags.forEach(e=>{ mx[e]={}; mags.forEach(r=>mx[e][r]=0); });
-  data.forEach(r=>{ if(mx[r.emetteur]&&mx[r.emetteur][r.receveur]!==undefined) mx[r.emetteur][r.receveur]+=r.quantite; });
+  data.forEach(r=>{ if(mx[r.donneur]&&mx[r.donneur][r.receveur]!==undefined) mx[r.donneur][r.receveur]+=r.quantite; });
   const maxV = Math.max(...mags.flatMap(e=>mags.map(r=>mx[e][r])),1);
   const sh = m => m.substring(0,5)+(m.length>5?'.':'');
   let html = `<table style="font-size:11px;width:100%"><thead><tr>
-    <th style="background:var(--green-dark);color:#fff;padding:7px 8px;text-align:left;border-radius:8px 0 0 0">↓ Émetteur / Receveur →</th>
+    <th style="background:var(--green-dark);color:#fff;padding:7px 8px;text-align:left;border-radius:8px 0 0 0">↓ Donneur / Receveur →</th>
     ${mags.map(r=>`<th style="background:var(--green-dark);color:#fff;padding:7px 5px;text-align:center">${sh(r)}</th>`).join('')}
     <th style="background:var(--green-dark);color:#fff;padding:7px 5px;text-align:center;border-radius:0 8px 0 0">Donné</th>
   </tr></thead><tbody>`;
@@ -1104,14 +1104,14 @@ function renderTopProduitsTransferts(data) {
 function renderDetailTransferts(data) {
   if(!data.length){ document.getElementById('transferts-detail').innerHTML='<p style="color:#888;padding:12px;font-size:13px">Aucun transfert sur cette période</p>'; return; }
   const sorted=[...data].sort((a,b)=>b.date.localeCompare(a.date));
-  let html=`<table><thead><tr><th>Date</th><th>Produit</th><th>Qté</th><th>De</th><th>Vers</th><th>Note</th></tr></thead><tbody>`;
+  let html=`<table><thead><tr><th>Date</th><th>Produit</th><th>Qté</th><th>Donneur</th><th>Receveur</th><th>Note</th></tr></thead><tbody>`;
   sorted.forEach(r=>{
     const df=r.date?new Date(r.date).toLocaleDateString('fr-FR'):'—';
-    const ec=MAG_COLORS_TR[r.emetteur]||'#888', rc=MAG_COLORS_TR[r.receveur]||'#888';
+    const ec=MAG_COLORS_TR[r.donneur]||'#888', rc=MAG_COLORS_TR[r.receveur]||'#888';
     html+=`<tr>
       <td>${df}</td><td><strong>${r.produit}</strong></td>
       <td style="text-align:center;font-weight:700">${r.quantite}</td>
-      <td><span style="background:${ec}22;color:${ec};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600">${r.emetteur}</span></td>
+      <td><span style="background:${ec}22;color:${ec};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600">${r.donneur}</span></td>
       <td><span style="background:${rc}22;color:${rc};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600">${r.receveur}</span></td>
       <td style="font-size:11px;color:var(--text-light)">${r.note||''}</td>
     </tr>`;
