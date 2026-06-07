@@ -667,18 +667,35 @@ function aggBy(data, groupKey, valueKey) {
 }
 
 function renderDashboard(data) {
-  const totalVentes = agg(data, 'Vente');
-  const totalPertes = agg(data, 'Perte');
-  const totalStock  = agg(data, 'Stock');
-  const totalReste  = agg(data, 'Reste');
+  // Option A : exclure le stock du Plat de la Veille (= recyclage du PDJ, pas du nouveau stock)
+  // Option C : pertes réelles = Perte PDJ (vendredis) + Reste PDV (invendus PDV réellement jetés)
+  const dataSansPDV = data.filter(r => r.Produit !== 'Plat de la Veille');
+  const dataPDV     = data.filter(r => r.Produit === 'Plat de la Veille');
+
+  const totalVentes = agg(data,        'Vente');
+  const totalStock  = agg(dataSansPDV, 'Stock');   // stock entrant hors recyclage PDV
+  const perteHorsPDV = agg(dataSansPDV, 'Perte');  // pertes PDJ (vendredis) + Pokés
+  const pertePDV     = agg(dataPDV,    'Reste');    // PDV invendus = vraie perte finale
+  const totalPertes  = perteHorsPDV + pertePDV;
+  const totalReste   = agg(data, 'Reste');
   const tauxEcoul   = totalStock > 0 ? (totalVentes / totalStock * 100).toFixed(1) : 0;
   const tauxPerte   = totalStock > 0 ? (totalPertes / totalStock * 100).toFixed(1) : 0;
 
-  const ventesByMag  = aggBy(data, 'Franchise', 'Vente');
-  const pertesByMag  = aggBy(data, 'Franchise', 'Perte');
-  const stockByMag   = aggBy(data, 'Franchise', 'Stock');
-  const ventesByProd = aggBy(data, 'Produit',   'Vente');
-  const pertesByProd = aggBy(data, 'Produit',   'Perte');
+  const ventesByMag  = aggBy(data,        'Franchise', 'Vente');
+  const stockByMag   = aggBy(dataSansPDV, 'Franchise', 'Stock');  // stock entrant par magasin
+  // pertes réelles par magasin = PDJ/Pokés Perte + PDV Reste (invendus)
+  const pertesByMag = {};
+  data.forEach(r => {
+    const val = r.Produit === 'Plat de la Veille' ? r.Reste : r.Perte;
+    pertesByMag[r.Franchise] = (pertesByMag[r.Franchise] || 0) + val;
+  });
+  const ventesByProd = aggBy(data, 'Produit', 'Vente');
+  // Pour PDV : la "perte" visible = Reste (invendus réels), pas la colonne Perte
+  const pertesByProd = {};
+  data.forEach(r => {
+    const val = r.Produit === 'Plat de la Veille' ? r.Reste : r.Perte;
+    pertesByProd[r.Produit] = (pertesByProd[r.Produit] || 0) + val;
+  });
 
   const magasins = Object.keys(ventesByMag).sort((a,b) => ventesByMag[b] - ventesByMag[a]);
   const produits = Object.keys(ventesByProd).sort((a,b) => ventesByProd[b] - ventesByProd[a]);
@@ -728,10 +745,14 @@ function renderDashboard(data) {
 
   document.getElementById('content').innerHTML = `
     <div class="kpi-grid">
-      ${kpiCard('🛒','Ventes totales', totalVentes.toLocaleString('fr-FR'), 'unités vendues', 'green')}
-      ${kpiCard('📦','Stock total', totalStock.toLocaleString('fr-FR'), 'unités approvisionnées', 'teal')}
-      ${kpiCard('📈','Taux d\'écoulement', tauxEcoul + '%', 'ventes / stock', 'yellow')}
-      ${kpiCard('⚠️','Pertes totales', totalPertes.toLocaleString('fr-FR'), 'taux : ' + tauxPerte + '%', 'orange')}
+      ${kpiCard('🛒','Ventes totales', totalVentes.toLocaleString('fr-FR'), 'PDJ + PDV + Pokés', 'green')}
+      ${kpiCard('📦','Stock entrant', totalStock.toLocaleString('fr-FR'), 'production nette (hors recyclage PDV)', 'teal')}
+      ${kpiCard('📈','Taux d\'écoulement', tauxEcoul + '%', 'ventes / stock entrant', 'yellow')}
+      ${kpiCard('⚠️','Pertes réelles', totalPertes.toLocaleString('fr-FR'), 'PDJ vendredis + PDV invendus · ' + tauxPerte + '%', 'orange')}
+    </div>
+    <div style="background:#EEF7F2;border:1px solid #B7E4C7;border-radius:10px;padding:10px 16px;margin-bottom:20px;font-size:12px;color:#2D6A4F;display:flex;align-items:center;gap:8px">
+      <span>ℹ️</span>
+      <span><strong>Méthodologie flux :</strong> Le Reste du Plat du Jour alimente le stock du Plat de la Veille du lendemain — il n'est donc pas compté deux fois. Le stock affiché correspond aux unités réellement produites/achetées. Les pertes incluent les PDJ perdus le vendredi + les PDV invendus en fin de journée.</span>
     </div>
 
     <div class="charts-row">
@@ -755,12 +776,12 @@ function renderDashboard(data) {
 
     <div class="card" style="margin-bottom:24px">
       <div class="card-title"><span class="dot"></span>Classement détaillé des magasins</div>
-      <div class="card-subtitle">Ventes, stock, taux d'écoulement et pertes par magasin</div>
+      <div class="card-subtitle">Ventes, stock entrant, taux d'écoulement et pertes réelles par magasin</div>
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>#</th><th>Magasin</th><th>Ventes</th><th>Stock</th>
-            <th>Taux écoul.</th><th>Pertes</th><th>Taux perte</th><th>Statut</th>
+            <th>#</th><th>Magasin</th><th>Ventes</th><th>Stock entrant</th>
+            <th>Taux écoul.</th><th>Pertes réelles</th><th>Taux perte</th><th>Statut</th>
           </tr></thead>
           <tbody>
             ${magasins.map((m, i) => {
@@ -794,11 +815,11 @@ function renderDashboard(data) {
 
     <div class="card">
       <div class="card-title"><span class="dot"></span>Analyse par produit</div>
-      <div class="card-subtitle">Performance de chaque produit sur le réseau</div>
+      <div class="card-subtitle">Performance de chaque produit sur le réseau · <em style="font-weight:400">Pour le Plat de la Veille : "Pertes" = invendus réels (Reste)</em></div>
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>#</th><th>Produit</th><th>Ventes</th><th>% du CA</th><th>Pertes</th><th>Taux perte</th>
+            <th>#</th><th>Produit</th><th>Ventes</th><th>% du CA</th><th>Pertes réelles</th><th>Taux perte</th>
           </tr></thead>
           <tbody>
             ${produits.map((p, i) => {
@@ -806,15 +827,16 @@ function renderDashboard(data) {
               const pe = pertesByProd[p] || 0;
               const pct = totalVentes > 0 ? (v/totalVentes*100).toFixed(1) : 0;
               const tp  = v > 0 ? (pe/v*100).toFixed(1) : 0;
-              return `<tr>
+              const isPDV = p === 'Plat de la Veille';
+              return `<tr${isPDV ? ' style="background:#FAFFF7"' : ''}>
                 <td><span class="rank-badge ${i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other'}">${i+1}</span></td>
-                <td><strong>${p}</strong></td>
+                <td><strong>${p}</strong>${isPDV ? ' <span style="font-size:10px;color:#52B788;font-weight:500">(recyclé)</span>' : ''}</td>
                 <td>${v.toLocaleString('fr-FR')}</td>
                 <td><div class="bar-inline">
                   <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
                   <strong>${pct}%</strong>
                 </div></td>
-                <td>${pe.toLocaleString('fr-FR')}</td>
+                <td>${pe.toLocaleString('fr-FR')}${isPDV ? ' <span style="font-size:10px;color:#888">(invendus)</span>' : ''}</td>
                 <td><strong style="color:${tp>5?'#C0392B':'#2D6A4F'}">${tp}%</strong></td>
               </tr>`;
             }).join('')}
@@ -840,9 +862,10 @@ function renderDashboard(data) {
                 const s = stockByMag[m] || 0;
                 tauxByMag[m] = s > 0 ? (ventesByMag[m] || 0) / s * 100 : 0;
               });
+              const stockByProd = aggBy(dataSansPDV,'Produit','Stock');
               const tauxByProd = {};
               produits.forEach(p => {
-                const s = aggBy(data,'Produit','Stock')[p] || 0;
+                const s = stockByProd[p] || 0;
                 tauxByProd[p] = s > 0 ? (ventesByProd[p] || 0) / s * 100 : 0;
               });
 
