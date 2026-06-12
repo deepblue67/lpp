@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>La Petite Pause — Suivi CA Moy/Jour</title>
+  <title>La Petite Pause — Suivi CA HT Moy/Jour</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -95,7 +95,7 @@
     </div>
   </div>
   <div class="header-center">
-    <h2>Suivi CA Moy/Jour — Par Magasin</h2>
+    <h2>Suivi CA HT Moy/Jour — Par Magasin</h2>
     <p>Objectif N = CA moy/jour N-1 × nb jours travaillés N</p>
   </div>
   <div class="header-right">
@@ -120,7 +120,7 @@
   </div>
 </main>
 
-<footer>Dashboard La Petite Pause — Suivi CA Moy/Jour &nbsp;·&nbsp; Données HISTORIQUE CA HT depuis Google Sheets</footer>
+<footer>Dashboard La Petite Pause — Suivi CA HT Moy/Jour &nbsp;·&nbsp; Données HISTORIQUE CA HT depuis Google Sheets</footer>
 
 <script>
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycKoHGdiUe0MREknK8zrduuIou2yqfRMyLo8MSEPN0xxe4F4W3m0w23Y1dT-of9PBU/exec';
@@ -462,9 +462,51 @@ function renderChart(site, last, slots) {
         borderWidth:2.5, fill:false, tension:.35, pointRadius:4, pointBackgroundColor:color }
     : { ...dsBase, label:labelN, data:dataN, backgroundColor:color+'CC', borderColor:color, borderWidth:1.5 };
 
+  // Plugin inline : affiche le % N vs N-1 au-dessus de chaque point/barre N
+  const pctPlugin = {
+    id: 'pctLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx, scales: { x, y } } = chart;
+      const ds = chart.data.datasets[1]; // dataset N
+      ctx.save();
+      ctx.font = '700 10px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+
+      ds.data.forEach((valN, i) => {
+        const valN1 = chart.data.datasets[0].data[i];
+        if (valN === null || valN1 === null || valN1 === 0) return;
+        const pct = ((valN - valN1) / valN1) * 100;
+        const sign = pct >= 0 ? '+' : '';
+        const label = sign + pct.toFixed(1) + '%';
+        const bgColor = pct >= 2 ? '#28A745' : pct <= -2 ? '#E05A4A' : '#E8A020';
+
+        // Position : au-dessus de la barre N (ou du point en mode ligne)
+        const meta = chart.getDatasetMeta(1);
+        const el = meta.data[i];
+        if (!el) return;
+        const px = el.x;
+        const py = isLine ? el.y - 6 : y.getPixelForValue(Math.max(valN, valN1)) - 6;
+
+        // Badge arrondi
+        const tw = ctx.measureText(label).width + 8;
+        const th = 14;
+        const bx = px - tw / 2, by = py - th;
+        ctx.fillStyle = bgColor;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, tw, th, 3);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.fillText(label, px, py - 1);
+      });
+      ctx.restore();
+    }
+  };
+
   CHARTS[site] = new Chart(ctx, {
     type: isLine ? 'line' : 'bar',
     data: { labels, datasets: [ds1, ds2] },
+    plugins: [pctPlugin],
     options: {
       responsive: true,
       interaction: { mode:'index', intersect:false },
