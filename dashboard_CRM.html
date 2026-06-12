@@ -249,6 +249,12 @@
         <option value="late">En retard</option>
         <option value="week">Cette semaine</option>
       </select>
+      <select class="filter" id="filterTypeContact" onchange="applyFilters()">
+        <option value="">Tous les types</option>
+        <option value="Téléphone">Téléphone</option>
+        <option value="Mail">Mail</option>
+        <option value="Rencontre">Rencontre</option>
+      </select>
       <select class="filter" id="filterStatut" onchange="applyFilters()">
         <option value="">Tous les statuts</option>
         <option value="Actif">Actif</option>
@@ -269,6 +275,7 @@
             <th onclick="sortBy('ville')">Ville <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('dateRappel')">Date rappel <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('noteActuelle')">Note <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('typeContact')">Type contact <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('statut')">Statut <span class="sort-icon">↕</span></th>
             <th>Téléphone</th>
           </tr>
@@ -339,6 +346,15 @@
           <label>Note actuelle (0–5)</label>
           <input type="number" id="f-noteActuelle" min="0" max="5" value="0">
         </div>
+        <div class="form-group">
+          <label>Type de contact</label>
+          <select id="f-typeContact">
+            <option value="">—</option>
+            <option value="Téléphone">Téléphone</option>
+            <option value="Mail">Mail</option>
+            <option value="Rencontre">Rencontre</option>
+          </select>
+        </div>
         <div class="form-group full">
           <label>Profil candidat</label>
           <textarea id="f-profil" placeholder="Description du candidat, situation, motivations…"></textarea>
@@ -383,6 +399,14 @@
           <select id="e-statut">
             <option value="Actif">Actif</option>
             <option value="Inactif">Inactif</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Type de contact</label>
+          <select id="e-typeContact">
+            <option value="">—</option>
+            <option value="Téléphone">Téléphone</option>
+            <option value="Mail">Mail</option>
+            <option value="Rencontre">Rencontre</option>
           </select>
         </div>
         <div class="form-group full"><label>Profil candidat</label><textarea id="e-profil"></textarea></div>
@@ -471,6 +495,7 @@ function resetAllFilters() {
   document.getElementById("filterVille").value = "";
   document.getElementById("filterRappel").value = "";
   document.getElementById("filterStatut").value = "";
+  document.getElementById("filterTypeContact").value = "";
   activeKpiFilter = "all";
   document.querySelectorAll(".kpi").forEach(el => el.classList.remove("active"));
   applyFilters();
@@ -634,6 +659,7 @@ function applyFilters() {
   const in7   = new Date(today); in7.setDate(today.getDate() + 7);
 
   const statut = document.getElementById("filterStatut").value;
+  const typeContact = document.getElementById("filterTypeContact").value;
 
   filtered = allData.filter(p => {
     if (q && !`${p.prospect} ${String(p.ville||"")} ${p.email} ${p.source} ${p.apport}`.toLowerCase().includes(q)) return false;
@@ -641,6 +667,7 @@ function applyFilters() {
     if (note   && String(p.noteActuelle) !== note) return false;
     if (vil    && String(p.ville||"").trim() !== vil) return false;
     if (statut && (p.statut || "Actif") !== statut) return false;
+    if (typeContact && (p.typeContact || "") !== typeContact) return false;
     if (rap === "late") {
       const d = parseDate(p.dateRappel);
       if (!d || d >= today) return false;
@@ -718,6 +745,7 @@ function renderTable() {
       <td>${esc(String(p.ville||""))}</td>
       <td>${rappel}</td>
       <td>${note}</td>
+      <td>${esc(p.typeContact||"")}</td>
       <td>${statut}</td>
       <td>${esc(p.telephone)}</td>
     </tr>`;
@@ -769,6 +797,7 @@ function openFiche(idx) {
   document.getElementById("e-noteInitiale").value = p.noteInitiale ?? 0;
   document.getElementById("e-noteActuelle").value = p.noteActuelle ?? 0;
   document.getElementById("e-statut").value       = p.statut || "Actif";
+  document.getElementById("e-typeContact").value  = p.typeContact || "";
   document.getElementById("e-profil").value       = p.profil || "";
   document.getElementById("e-notes").value        = p.notes  || "";
 
@@ -820,6 +849,7 @@ async function updateProspect() {
     profil       : document.getElementById("e-profil").value.trim(),
     notes        : document.getElementById("e-notes").value.trim(),
     statut       : document.getElementById("e-statut").value,
+    typeContact  : document.getElementById("e-typeContact").value,
   };
 
   try {
@@ -867,6 +897,7 @@ async function submitProspect() {
     noteActuelle: parseInt(document.getElementById("f-noteActuelle").value) || 0,
     profil      : document.getElementById("f-profil").value.trim(),
     notes       : document.getElementById("f-notes").value.trim(),
+    typeContact : document.getElementById("f-typeContact").value,
   };
 
   try {
