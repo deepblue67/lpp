@@ -485,37 +485,84 @@ function buildCharts() {
 
   const palette = ["#2563eb","#7c3aed","#0891b2","#059669","#d97706","#dc2626","#db2777","#64748b"];
   const noteColors = ["#94a3b8","#ef4444","#f97316","#f59e0b","#22c55e","#16a34a"];
+  const srcLabels = srcSorted.map(e => e[0]);
+  const villeLabels = villeTop.map(e => e[0]);
 
-  new Chart(document.getElementById("chartSource"), {
+  function chartClickHandler(chart, evt, labels, filterEl, applyFn) {
+    const pts = chart.getElementsAtEventForMode(evt, "nearest", { intersect: true }, false);
+    if (!pts.length) return;
+    const label = labels[pts[0].index];
+    const sel = document.getElementById(filterEl);
+    if (sel.value === label) { sel.value = ""; }
+    else { sel.value = label; }
+    applyFn();
+    document.querySelector(".toolbar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const chartSrc = new Chart(document.getElementById("chartSource"), {
     type: "bar",
     data: {
-      labels: srcSorted.map(e => e[0].length > 18 ? e[0].substring(0,16)+"…" : e[0]),
-      datasets: [{ data: srcSorted.map(e => e[1]), backgroundColor: palette, borderRadius: 6 }]
+      labels: srcLabels.map(l => l.length > 18 ? l.substring(0,16)+"…" : l),
+      datasets: [{ data: srcSorted.map(e => e[1]), backgroundColor: palette, borderRadius: 6,
+        hoverBackgroundColor: palette.map(c => c + "bb") }]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        title: (items) => srcLabels[items[0].dataIndex],
+        footer: () => "Cliquer pour filtrer"
+      }}},
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+      onClick: (evt) => chartClickHandler(chartSrc, evt, srcLabels, "filterSource", applyFilters)
+    }
   });
+  document.getElementById("chartSource").style.cursor = "pointer";
 
-  new Chart(document.getElementById("chartNotes"), {
+  const chartNotes = new Chart(document.getElementById("chartNotes"), {
     type: "doughnut",
     data: {
       labels: ["0","1","2","3","4","5"],
-      datasets: [{ data: [0,1,2,3,4,5].map(n => noteCount[n]), backgroundColor: noteColors, borderWidth: 2 }]
+      datasets: [{ data: [0,1,2,3,4,5].map(n => noteCount[n]),
+        backgroundColor: noteColors, borderWidth: 2,
+        hoverOffset: 8 }]
     },
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: "right", labels: { font: { size: 12 }, padding: 8 } } } }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "right", labels: { font: { size: 12 }, padding: 8 } },
+        tooltip: { callbacks: { footer: () => "Cliquer pour filtrer" }}
+      },
+      onClick: (evt) => {
+        const pts = chartNotes.getElementsAtEventForMode(evt, "nearest", { intersect: true }, false);
+        if (!pts.length) return;
+        const noteVal = String(pts[0].index);
+        const sel = document.getElementById("filterNote");
+        sel.value = (sel.value === noteVal) ? "" : noteVal;
+        applyFilters();
+        document.querySelector(".toolbar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
   });
+  document.getElementById("chartNotes").style.cursor = "pointer";
 
-  new Chart(document.getElementById("chartVilles"), {
+  const chartVilles = new Chart(document.getElementById("chartVilles"), {
     type: "bar",
     data: {
-      labels: villeTop.map(e => e[0].length > 16 ? e[0].substring(0,14)+"…" : e[0]),
-      datasets: [{ data: villeTop.map(e => e[1]), backgroundColor: "#0891b2", borderRadius: 6 }]
+      labels: villeLabels.map(l => l.length > 16 ? l.substring(0,14)+"…" : l),
+      datasets: [{ data: villeTop.map(e => e[1]), backgroundColor: "#0891b2", borderRadius: 6,
+        hoverBackgroundColor: "#0891b2bb" }]
     },
-    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        title: (items) => villeLabels[items[0].dataIndex],
+        footer: () => "Cliquer pour filtrer"
+      }}},
+      scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } },
+      onClick: (evt) => chartClickHandler(chartVilles, evt, villeLabels, "filterVille", applyFilters)
+    }
   });
+  document.getElementById("chartVilles").style.cursor = "pointer";
 }
 
 // ── Filters ───────────────────────────────────────────────────────────────
