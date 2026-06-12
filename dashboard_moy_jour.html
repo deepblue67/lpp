@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>La Petite Pause — Suivi CA Moy/Jour</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --navy:#2E4E8C;--indigo:#5072B8;--indigo-mid:#6A8FCC;--indigo-light:#C8D8F0;--indigo-pale:#EBF0FA;
+      --amber:#E8A020;--coral:#E05A4A;--bg:#F2F5FC;--card:#FFFFFF;
+      --text:#1A2440;--text-light:#5A6A8A;--border:#D5DFF0;
+      --shadow:0 2px 12px rgba(26,43,82,.10);--shadow-hover:0 6px 24px rgba(26,43,82,.18);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+    header{
+      background:linear-gradient(135deg,var(--navy) 0%,#1E3A7A 100%);
+      padding:0 32px;display:flex;align-items:center;justify-content:space-between;
+      height:80px;box-shadow:0 2px 16px rgba(0,0,0,.25);position:sticky;top:0;z-index:100;
+    }
+    .header-left{display:flex;align-items:center;gap:14px;}
+    .header-title{color:#fff;}
+    .header-title h1{font-size:18px;font-weight:700;letter-spacing:.3px;}
+    .header-title p{font-size:11px;color:var(--indigo-light);font-weight:400;margin-top:1px;}
+    .header-center{position:absolute;left:50%;transform:translateX(-50%);text-align:center;color:#fff;pointer-events:none;}
+    .header-center h2{font-size:24px;font-weight:800;letter-spacing:.2px;}
+    .header-center p{font-size:12px;color:var(--indigo-light);margin-top:3px;font-weight:400;}
+    .header-right{display:flex;align-items:center;gap:10px;}
+    #last-update{font-size:11px;color:var(--indigo-light);}
+    .btn-refresh{background:var(--indigo-mid);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .2s;}
+    .btn-refresh:hover{background:var(--indigo);}
+    .filters-bar{background:var(--card);border-bottom:1px solid var(--border);padding:14px 32px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+    .filter-label{font-size:12px;font-weight:600;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;}
+    .filter-select{border:1.5px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;font-family:inherit;color:var(--text);background:#fff;cursor:pointer;outline:none;transition:border-color .2s;}
+    .filter-select:focus{border-color:var(--indigo-mid);}
+    main{padding:28px 32px;max-width:1440px;margin:0 auto;}
+    .site-block{background:var(--card);border-radius:16px;box-shadow:var(--shadow);margin-bottom:24px;overflow:hidden;transition:box-shadow .2s;}
+    .site-block:hover{box-shadow:var(--shadow-hover);}
+    .site-header{
+      padding:14px 24px;display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid var(--border);
+    }
+    .site-name{font-size:17px;font-weight:800;display:flex;align-items:center;gap:10px;}
+    .site-dot{width:13px;height:13px;border-radius:50%;flex-shrink:0;}
+    .site-meta{font-size:12px;color:var(--text-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+    .days-badge{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;color:#fff;}
+    .site-body{display:grid;grid-template-columns:270px 1fr;gap:0;}
+    .gauge-panel{
+      padding:16px 18px 14px;border-right:1px solid var(--border);
+      display:flex;flex-direction:column;align-items:center;gap:10px;
+    }
+    .gauge-title{font-size:11px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;text-align:center;}
+    .chart-panel{padding:18px 20px 16px;}
+    .chart-subtitle{font-size:11px;color:var(--text-light);margin-bottom:10px;}
+    .metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;}
+    .metric-item{background:var(--indigo-pale);border-radius:9px;padding:9px 11px;}
+    .metric-item.full{grid-column:1/-1;}
+    .metric-label{font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+    .metric-value{font-size:13px;font-weight:700;color:var(--text);line-height:1.2;}
+    .ecart-pos{background:#D4EDDA;}
+    .ecart-pos .metric-label,.ecart-pos .metric-value{color:#155724;}
+    .ecart-neg{background:#F8D7DA;}
+    .ecart-neg .metric-label,.ecart-neg .metric-value{color:#721C24;}
+    .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;gap:16px;color:var(--text-light);}
+    .spinner{width:36px;height:36px;border:3px solid var(--indigo-light);border-top-color:var(--navy);border-radius:50%;animation:spin .8s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    footer{text-align:center;padding:24px;font-size:12px;color:var(--text-light);border-top:1px solid var(--border);margin-top:8px;}
+    @media(max-width:1000px){
+      .site-body{grid-template-columns:1fr;}
+      .gauge-panel{border-right:none;border-bottom:1px solid var(--border);}
+    }
+    @media(max-width:600px){main{padding:16px;}header{padding:0 16px;}.filters-bar{padding:12px 16px;}}
+  </style>
+</head>
+<body>
+
+<header style="position:relative">
+  <div class="header-left">
+    <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="24" fill="white"/>
+      <text x="50" y="58" text-anchor="middle" font-size="30" font-weight="bold" fill="#2E4E8C" font-family="Arial">$</text>
+      <path d="M18 30 Q50 10 82 30" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"/>
+      <polygon points="82,30 70,22 78,42" fill="white"/>
+      <path d="M82 70 Q50 90 18 70" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"/>
+      <polygon points="18,70 30,78 22,58" fill="white"/>
+    </svg>
+    <div class="header-title" style="margin-left:14px">
+      <h1>La Petite Pause</h1>
+      <p>Performance journalière</p>
+    </div>
+  </div>
+  <div class="header-center">
+    <h2>Suivi CA Moy/Jour — Par Magasin</h2>
+    <p>Objectif N = CA moy/jour N-1 × nb jours travaillés N</p>
+  </div>
+  <div class="header-right">
+    <span id="last-update">—</span>
+    <button class="btn-refresh" onclick="loadData()">↻ Actualiser</button>
+  </div>
+</header>
+
+<div class="filters-bar">
+  <span class="filter-label">Période</span>
+  <select class="filter-select" id="nb-months" onchange="applyFilters()">
+    <option value="6">6 derniers mois</option>
+    <option value="12" selected>12 derniers mois</option>
+    <option value="18">18 derniers mois</option>
+    <option value="24">24 derniers mois</option>
+  </select>
+</div>
+
+<main>
+  <div id="content">
+    <div class="loading"><div class="spinner"></div><span>Chargement des données…</span></div>
+  </div>
+</main>
+
+<footer>Dashboard La Petite Pause — Suivi CA Moy/Jour &nbsp;·&nbsp; Données HISTORIQUE CA HT depuis Google Sheets</footer>
+
+<script>
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycKoHGdiUe0MREknK8zrduuIou2yqfRMyLo8MSEPN0xxe4F4W3m0w23Y1dT-of9PBU/exec';
+
+const SITES = ['Lingo','Stras','Eckbo','Schilic','Illkirch'];
+const SITE_NAMES = {Lingo:'Lingolsheim',Stras:'Strasbourg',Eckbo:'Eckbolsheim',Schilic:'Schiltigheim',Illkirch:'Illkirch'};
+const SITE_COLORS = {Lingo:'#3B5998',Stras:'#E84393',Eckbo:'#FF8C00',Schilic:'#28A745',Illkirch:'#8B5CF6'};
+const MOIS_NUM = {octobre:10,novembre:11,décembre:12,janvier:1,février:2,mars:3,avril:4,mai:5,juin:6,juillet:7,août:8,septembre:9};
+
+let rawData = [];
+let CHARTS = {};
+
+const fmt0 = n => (isNaN(n)||n===null) ? '—' : Math.round(n).toLocaleString('fr-FR');
+const fmtE = n => fmt0(n) === '—' ? '—' : fmt0(n) + ' €';
+const fmtK = n => {
+  if (isNaN(n)||n===null) return '—';
+  if (Math.abs(n)>=1000000) return (n/1000000).toFixed(2).replace('.',',')+' M€';
+  if (Math.abs(n)>=1000)    return (n/1000).toFixed(1).replace('.',',')+' k€';
+  return fmt0(n)+' €';
+};
+
+// ── Chargement ────────────────────────────────────────────────────────────────
+async function loadData() {
+  document.getElementById('content').innerHTML = '<div class="loading"><div class="spinner"></div><span>Chargement des données…</span></div>';
+  document.getElementById('last-update').textContent = 'Chargement…';
+  try {
+    const r = await fetch(APPS_SCRIPT_URL);
+    const j = await r.json();
+    if (j.status !== 'ok') throw new Error(j.error || 'Erreur Apps Script');
+    rawData = enrich(j.data);
+    document.getElementById('last-update').textContent = 'Mis à jour ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    applyFilters();
+  } catch(e) {
+    document.getElementById('content').innerHTML = `<div class="loading"><span style="font-size:40px">⚠️</span><span style="color:#E05A4A;font-weight:600">Erreur : ${e.message}</span><button class="btn-refresh" onclick="loadData()">↻ Réessayer</button></div>`;
+    document.getElementById('last-update').textContent = 'Erreur';
+    console.error(e);
+  }
+}
+
+function enrich(data) {
+  return data.map(r => {
+    const parts = (r.mois || '').split(' ');
+    const calYear = parseInt(parts[parts.length-1]) || 0;
+    const monthNum = MOIS_NUM[r.moisKey] || 0;
+    return {...r, calYear, monthNum, sortKey: calYear*100 + monthNum};
+  }).sort((a,b) => a.sortKey - b.sortKey);
+}
+
+function applyFilters() {
+  if (!rawData.length) return;
+  const n = parseInt(document.getElementById('nb-months').value) || 12;
+  renderAll(n);
+}
+
+// ── Rendu principal ───────────────────────────────────────────────────────────
+function renderAll(n) {
+  const allKeys = [...new Set(rawData.map(r => r.sortKey))].sort((a,b)=>a-b);
+  const lastNKeys = new Set(allKeys.slice(-n));
+  const last = rawData.filter(r => lastNKeys.has(r.sortKey));
+
+  Object.values(CHARTS).forEach(c => c.destroy()); CHARTS = {};
+
+  document.getElementById('content').innerHTML = SITES.map(s => buildBlock(s, last)).join('');
+  SITES.forEach(s => renderChart(s, last));
+}
+
+// ── Bloc magasin ──────────────────────────────────────────────────────────────
+function buildBlock(site, last) {
+  const color = SITE_COLORS[site];
+  const curr = last[last.length - 1];
+  const prev = rawData.find(r => r.moisKey === curr.moisKey && r.calYear === curr.calYear - 1);
+
+  let gaugePct = null, moyN1 = null, objectif = null, moyN = null;
+
+  if (prev && prev.nb_jours > 0 && curr.nb_jours > 0) {
+    moyN1    = prev[site] / prev.nb_jours;
+    objectif = moyN1 * curr.nb_jours;
+    if (objectif > 0) gaugePct = (curr[site] / objectif) * 100;
+  }
+  if (curr.nb_jours > 0) moyN = curr[site] / curr.nb_jours;
+
+  const ecart    = objectif != null ? curr[site] - objectif : null;
+  const ecartCls = ecart === null ? '' : Math.abs(ecart/objectif) < 0.01 ? '' : ecart >= 0 ? 'ecart-pos' : 'ecart-neg';
+  const ecartStr = ecart === null ? '—'
+    : (ecart >= 0 ? '▲ +' : '▼ ') + fmt0(Math.abs(ecart)) + ' €'
+    + (objectif > 0 ? ' (' + (ecart>=0?'+':'') + ((ecart/objectif)*100).toFixed(1) + '%)' : '');
+
+  return `
+  <div class="site-block">
+    <div class="site-header">
+      <div class="site-name">
+        <div class="site-dot" style="background:${color}"></div>
+        ${SITE_NAMES[site]}
+      </div>
+      <div class="site-meta">
+        <span>Mois en cours : <strong>${curr.mois}</strong></span>
+        <span class="days-badge" style="background:${color}">📅 ${curr.nb_jours} jour${curr.nb_jours>1?'s':''} travaillé${curr.nb_jours>1?'s':''} (N)</span>
+        ${prev ? `<span style="background:${color}44;color:${color};padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">${prev.nb_jours}j N-1</span>` : '<span style="color:#ccc;font-size:11px">N-1 non disponible</span>'}
+      </div>
+    </div>
+    <div class="site-body">
+      <div class="gauge-panel">
+        <div class="gauge-title">Avancement ${curr.mois.split(' ')[0]}</div>
+        ${makeGaugeSVG(gaugePct, color)}
+        <div class="metric-grid">
+          <div class="metric-item">
+            <div class="metric-label">Moy/j N-1</div>
+            <div class="metric-value">${fmtE(moyN1)}</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Moy/j N</div>
+            <div class="metric-value">${fmtE(moyN)}</div>
+          </div>
+          <div class="metric-item" style="background:${color}18;border:1.5px solid ${color}44">
+            <div class="metric-label" style="color:${color}">Objectif N</div>
+            <div class="metric-value" style="color:${color}">${fmtE(objectif)}</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">CA réel N</div>
+            <div class="metric-value">${fmtE(curr[site])}</div>
+          </div>
+          <div class="metric-item full ${ecartCls}">
+            <div class="metric-label">Écart vs objectif</div>
+            <div class="metric-value">${ecartStr}</div>
+          </div>
+        </div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-subtitle">CA HT par mois — N-1 (référence) vs N (réel) · Survoler pour détail jours + moy/jour</div>
+        <canvas id="chart-${site}" height="155"></canvas>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Jauge SVG ─────────────────────────────────────────────────────────────────
+function makeGaugeSVG(pct, siteColor) {
+  // Semi-circle: 0% at left (180°), 150% at right (0°)
+  // Standard math angles, SVG y-down: x = cx + r*cos(a), y = cy - r*sin(a)
+  const W = 250, H = 148;
+  const cx = 125, cy = 120;
+  const R = 90, rIn = 63;
+  const d = v => v.toFixed(2);
+
+  const pctToRad = p => (1 - p/150) * Math.PI; // 0% → π (left), 150% → 0 (right)
+  const pt = (p, r) => [cx + r*Math.cos(pctToRad(p)), cy - r*Math.sin(pctToRad(p))];
+
+  // Annular sector: outer arc CCW (sweep=0), inner arc CW (sweep=1)
+  const sector = (p1, p2, fill, stroke) => {
+    const [x1,y1]=pt(p1,R), [x2,y2]=pt(p2,R), [x3,y3]=pt(p2,rIn), [x4,y4]=pt(p1,rIn);
+    return `<path d="M${d(x1)},${d(y1)} A${R},${R} 0 0,0 ${d(x2)},${d(y2)} L${d(x3)},${d(y3)} A${rIn},${rIn} 0 0,1 ${d(x4)},${d(y4)} Z" fill="${fill}" stroke="${stroke}" stroke-width="0.5"/>`;
+  };
+
+  // Tick (line outward from arc)
+  const tick = (p, len, col, w) => {
+    const [x1,y1]=pt(p,R+1), [x2,y2]=pt(p,R+len);
+    return `<line x1="${d(x1)}" y1="${d(y1)}" x2="${d(x2)}" y2="${d(y2)}" stroke="${col}" stroke-width="${w}"/>`;
+  };
+  const tickLbl = (p, lbl, col, bold, rOff) => {
+    const [lx,ly]=pt(p,R+rOff);
+    return `<text x="${d(lx)}" y="${d(ly+3)}" text-anchor="middle" font-size="${bold?9:8}" font-weight="${bold?700:400}" fill="${col}" font-family="Inter">${lbl}</text>`;
+  };
+
+  const needleColor = pct === null ? '#bbb' : pct < 80 ? '#E05A4A' : pct < 100 ? '#E8A020' : '#28A745';
+  let needle = '', valText = '—';
+
+  if (pct !== null) {
+    const clamp = Math.min(Math.max(pct, 0), 152);
+    const [nx,ny] = pt(clamp, R-12);
+    valText = pct.toFixed(1) + '%';
+    needle = `
+      <line x1="${cx}" y1="${cy}" x2="${d(nx)}" y2="${d(ny)}" stroke="${needleColor}" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="9" fill="${needleColor}"/>
+      <circle cx="${cx}" cy="${cy}" r="4" fill="white"/>`;
+  }
+
+  // 100% tick marker (green line across full width of arc)
+  const [m1x,m1y]=pt(100,rIn-2), [m2x,m2y]=pt(100,R+2);
+
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block;margin:0 auto">
+    ${sector(0,   80,  '#FCEAEA','#F5C6C6')}
+    ${sector(80,  100, '#FEF9E7','#FAE5A0')}
+    ${sector(100, 150, '#EBF7EE','#B8E5C5')}
+    <line x1="${d(m1x)}" y1="${d(m1y)}" x2="${d(m2x)}" y2="${d(m2y)}" stroke="#28A745" stroke-width="2" stroke-dasharray="3,2" opacity="0.8"/>
+    ${tick(0,   10, '#aaa', 1.5)} ${tickLbl(0,   '0%',    '#999', false, 22)}
+    ${tick(50,   7, '#ccc', 1)}   ${tickLbl(50,  '50%',   '#bbb', false, 20)}
+    ${tick(100, 12, '#28A745', 2.5)} ${tickLbl(100,'100%','#28A745',true, 26)}
+    ${tick(150, 10, '#aaa', 1.5)} ${tickLbl(150, '150%',  '#999', false, 22)}
+    ${needle}
+    <text x="${cx}" y="${cy+22}" text-anchor="middle" font-size="20" font-weight="800" fill="${needleColor}" font-family="Inter">${valText}</text>
+  </svg>`;
+}
+
+// ── Graphique barres ──────────────────────────────────────────────────────────
+function renderChart(site, last) {
+  const ctx = document.getElementById('chart-' + site);
+  if (!ctx) return;
+
+  const color = SITE_COLORS[site];
+  const labels = [], dataN = [], dataN1 = [], metaN = [], metaN1 = [];
+
+  for (const row of last) {
+    const parts = row.mois.split(' ');
+    labels.push(parts[0].slice(0,3) + " '" + (parts[1]||'').slice(2));
+    dataN.push(row[site] || 0);
+    metaN.push(row);
+    const prev = rawData.find(r => r.moisKey === row.moisKey && r.calYear === row.calYear - 1);
+    dataN1.push(prev ? (prev[site] || 0) : null);
+    metaN1.push(prev || null);
+  }
+
+  CHARTS[site] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'N-1 (référence)',
+          data: dataN1,
+          backgroundColor: color + '50',
+          borderColor: color + '80',
+          borderWidth: 1,
+          borderRadius: 4,
+          borderSkipped: false,
+        },
+        {
+          label: 'N (réel)',
+          data: dataN,
+          backgroundColor: color + 'CC',
+          borderColor: color,
+          borderWidth: 1.5,
+          borderRadius: 4,
+          borderSkipped: false,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: {mode: 'index', intersect: false},
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {font: {family:'Inter',size:11}, padding:14, boxWidth:14, useBorderRadius:true, borderRadius:3}
+        },
+        tooltip: {
+          callbacks: {
+            label(c) {
+              const isN = c.datasetIndex === 1;
+              const row = isN ? metaN[c.dataIndex] : metaN1[c.dataIndex];
+              if (!row || c.raw === null) return ` ${c.dataset.label} : données N/A`;
+              const ca  = c.raw;
+              const j   = row.nb_jours;
+              const moy = j > 0 ? Math.round(ca / j) : null;
+              // Objectif line for N bar
+              let objLine = '';
+              if (isN) {
+                const prow = metaN1[c.dataIndex];
+                if (prow && prow.nb_jours > 0 && j > 0) {
+                  const obj = Math.round((prow[site] / prow.nb_jours) * j);
+                  const diff = ca - obj;
+                  objLine = ` Objectif : ${fmt0(obj)} € | Écart : ${diff>=0?'+':''}${fmt0(diff)} €`;
+                }
+              }
+              return [
+                ` ${c.dataset.label} : ${fmt0(ca)} €`,
+                ` Jours travaillés : ${j}`,
+                ` Moy/jour : ${moy !== null ? fmt0(moy)+' €/j' : '—'}`,
+                ...(objLine ? [objLine] : []),
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {grid:{display:false}, ticks:{font:{family:'Inter',size:10}}},
+        y: {
+          ticks: {font:{family:'Inter',size:10}, callback: v => fmtK(v)},
+          grid: {color:'#E8EDF8'}
+        }
+      }
+    }
+  });
+}
+
+loadData();
+</script>
+</body>
+</html>
