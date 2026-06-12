@@ -91,10 +91,14 @@
   tbody tr { border-bottom: 1px solid #f1f5f9; transition: background .1s; }
   tbody tr:hover { background: #f8fafc; }
   tbody tr:last-child { border-bottom: none; }
+  tbody tr.inactive { opacity: .45; background: #f8fafc; }
+  tbody tr.inactive:hover { opacity: .6; }
   td { padding: 10px 14px; vertical-align: middle; }
   td.prospect-name { font-weight: 600; color: var(--text); }
   td.prospect-name button.link-btn { background: none; border: none; color: var(--accent); font-weight: 600; cursor: pointer; font-size: 13px; padding: 0; text-align: left; }
   td.prospect-name button.link-btn:hover { text-decoration: underline; }
+  .badge-statut-actif { background: #dcfce7; color: #166534; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+  .badge-statut-inactif { background: #f1f5f9; color: #64748b; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
 
   .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
   .badge.src-fd { background: #dbeafe; color: #1d4ed8; }
@@ -244,6 +248,11 @@
         <option value="late">En retard</option>
         <option value="week">Cette semaine</option>
       </select>
+      <select class="filter" id="filterStatut" onchange="applyFilters()">
+        <option value="">Tous les statuts</option>
+        <option value="Actif">Actif</option>
+        <option value="Inactif">Inactif</option>
+      </select>
       <span class="badge-count" id="result-count">— résultats</span>
     </div>
 
@@ -257,6 +266,7 @@
             <th onclick="sortBy('ville')">Ville <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('dateRappel')">Date rappel <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('noteActuelle')">Note <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('statut')">Statut <span class="sort-icon">↕</span></th>
             <th>Téléphone</th>
           </tr>
         </thead>
@@ -353,14 +363,49 @@
   </div>
 </div>
 
-<!-- ── Modal Fiche Prospect ── -->
+<!-- ── Modal Fiche / Édition Prospect ── -->
 <div class="overlay" id="fiche-modal">
   <div class="modal" style="max-width:700px">
     <div class="modal-header">
       <h2 id="fiche-title">Fiche prospect</h2>
       <button class="modal-close" onclick="closeFiche()">✕</button>
     </div>
-    <div class="modal-body" id="fiche-body"></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Nom du prospect *</label><input type="text" id="e-prospect"></div>
+        <div class="form-group"><label>Téléphone</label><input type="text" id="e-telephone"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="e-email"></div>
+        <div class="form-group"><label>Source</label>
+          <select id="e-source">
+            <option value="">— Choisir —</option>
+            <option>Franchise Direct</option><option>WordPress</option>
+            <option>Toute la Franchise</option><option>Les Rencontres Digitales</option>
+            <option>Direct</option><option>L'Express Franchise</option>
+            <option>Franchise Expo Salon</option><option>Reussir Franchise</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Apport / Budget</label><input type="text" id="e-apport"></div>
+        <div class="form-group"><label>Ville / Région</label><input type="text" id="e-ville"></div>
+        <div class="form-group"><label>Date de contact</label><input type="date" id="e-dateContact"></div>
+        <div class="form-group"><label>Date de rappel</label><input type="date" id="e-dateRappel"></div>
+        <div class="form-group"><label>Présentation envoyée</label><input type="text" id="e-presentation"></div>
+        <div class="form-group"><label>Date visio</label><input type="date" id="e-dateVisio"></div>
+        <div class="form-group"><label>Note initiale (0–5)</label><input type="number" id="e-noteInitiale" min="0" max="5"></div>
+        <div class="form-group"><label>Note actuelle (0–5)</label><input type="number" id="e-noteActuelle" min="0" max="5"></div>
+        <div class="form-group"><label>Statut</label>
+          <select id="e-statut">
+            <option value="Actif">Actif</option>
+            <option value="Inactif">Inactif</option>
+          </select>
+        </div>
+        <div class="form-group full"><label>Profil candidat</label><textarea id="e-profil"></textarea></div>
+        <div class="form-group full"><label>Notes complémentaires</label><textarea id="e-notes"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeFiche()">Annuler</button>
+      <button class="btn primary" id="btn-update" onclick="updateProspect()">Enregistrer les modifications</button>
+    </div>
   </div>
 </div>
 
@@ -368,7 +413,7 @@
 
 <script>
 // ── CONFIG — remplacer par l'URL de votre Apps Script déployé ──
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyTLZcAbsKrpVvJxgnOnFbntPRnaZj60KZTmIoOQ_KmztwdPojqFEAgLIwTGoFH14kT/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKjTq3v8WbgivHzLxV32FlZ0UPbcRcmNwCpU1A9eQZyKP5PqXhJXbOLgqR71hunE-U/exec";
 
 let allData = [];
 let filtered = [];
@@ -439,6 +484,7 @@ function kpiFilter(type) {
     document.getElementById("filterNote").value = "";
     document.getElementById("filterVille").value = "";
     document.getElementById("filterRappel").value = "";
+    document.getElementById("filterStatut").value = "";
     activeKpiFilter = "all";
   }
   document.querySelectorAll(".kpi").forEach(el => el.classList.remove("active"));
@@ -589,11 +635,14 @@ function applyFilters() {
   const today = new Date(); today.setHours(0,0,0,0);
   const in7   = new Date(today); in7.setDate(today.getDate() + 7);
 
+  const statut = document.getElementById("filterStatut").value;
+
   filtered = allData.filter(p => {
     if (q && !`${p.prospect} ${String(p.ville||"")} ${p.email} ${p.source} ${p.apport}`.toLowerCase().includes(q)) return false;
-    if (src  && p.source !== src) return false;
-    if (note && String(p.noteActuelle) !== note) return false;
-    if (vil  && String(p.ville||"").trim() !== vil) return false;
+    if (src    && p.source !== src) return false;
+    if (note   && String(p.noteActuelle) !== note) return false;
+    if (vil    && String(p.ville||"").trim() !== vil) return false;
+    if (statut && (p.statut || "Actif") !== statut) return false;
     if (rap === "late") {
       const d = parseDate(p.dateRappel);
       if (!d || d >= today) return false;
@@ -602,16 +651,9 @@ function applyFilters() {
       const d = parseDate(p.dateRappel);
       if (!d || d < today || d > in7) return false;
     }
-    // KPI quick filter
     if (activeKpiFilter === "high" && p.noteActuelle < 4) return false;
-    if (activeKpiFilter === "late") {
-      const d = parseDate(p.dateRappel);
-      if (!d || d >= today) return false;
-    }
-    if (activeKpiFilter === "week") {
-      const d = parseDate(p.dateRappel);
-      if (!d || d < today || d > in7) return false;
-    }
+    if (activeKpiFilter === "late") { const d = parseDate(p.dateRappel); if (!d || d >= today) return false; }
+    if (activeKpiFilter === "week") { const d = parseDate(p.dateRappel); if (!d || d < today || d > in7) return false; }
     if (activeKpiFilter === "visio" && !p.dateVisio) return false;
     return true;
   });
@@ -653,25 +695,31 @@ function renderTable() {
   const slice = filtered.slice(start, start + PAGE_SIZE);
 
   document.getElementById("result-count").textContent = `${filtered.length} résultat${filtered.length !== 1 ? "s" : ""}`;
-  document.getElementById("pager-info").textContent = `${start+1}–${Math.min(start+PAGE_SIZE, filtered.length)} sur ${filtered.length}`;
+  document.getElementById("pager-info").textContent = filtered.length ? `${start+1}–${Math.min(start+PAGE_SIZE, filtered.length)} sur ${filtered.length}` : "0 résultat";
   document.getElementById("btn-prev").disabled = page === 0;
   document.getElementById("btn-next").disabled = start + PAGE_SIZE >= filtered.length;
 
   if (slice.length === 0) { tbody.innerHTML = ""; empty.style.display = "block"; return; }
   empty.style.display = "none";
 
-  tbody.innerHTML = slice.map(p => {
-    const badge = srcBadge(p.source);
-    const note  = `<span class="note-pill note-${p.noteActuelle}">${p.noteActuelle}</span>`;
-    const rappel = formatRappel(p.dateRappel, today, in7);
-    const name = `<button class="link-btn" onclick='openFiche(${JSON.stringify(p).replace(/'/g,"\\'")})'>${esc(p.prospect)}</button>`;
-    return `<tr>
-      <td class="prospect-name">${name}</td>
+  tbody.innerHTML = slice.map((p, i) => {
+    const realIdx = allData.indexOf(p);
+    const badge   = srcBadge(p.source);
+    const note    = `<span class="note-pill note-${p.noteActuelle}">${p.noteActuelle}</span>`;
+    const rappel  = formatRappel(p.dateRappel, today, in7);
+    const statut  = p.statut === "Inactif"
+      ? `<span class="badge-statut-inactif">Inactif</span>`
+      : `<span class="badge-statut-actif">Actif</span>`;
+    const rowCls  = p.statut === "Inactif" ? " class=\"inactive\"" : "";
+    // Bug fix: use data-index instead of embedding JSON in onclick
+    return `<tr${rowCls}>
+      <td class="prospect-name"><button class="link-btn" data-idx="${realIdx}" onclick="openFiche(this.dataset.idx)">${esc(p.prospect)}</button></td>
       <td>${badge}</td>
       <td>${esc(p.apport)}</td>
-      <td>${esc(p.ville)}</td>
+      <td>${esc(String(p.ville||""))}</td>
       <td>${rappel}</td>
       <td>${note}</td>
+      <td>${statut}</td>
       <td>${esc(p.telephone)}</td>
     </tr>`;
   }).join("");
@@ -702,48 +750,98 @@ function formatRappel(dateStr, today, in7) {
   return `<span class="date-ok">${dateStr}</span>`;
 }
 
-// ── Fiche Prospect ────────────────────────────────────────────────────────
-function openFiche(p) {
-  document.getElementById("fiche-title").textContent = p.prospect;
-  document.getElementById("fiche-body").innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
-      <div class="fiche-section" style="padding-right:20px;border-right:1px solid var(--border)">
-        <h3>Coordonnées</h3>
-        ${fr("Téléphone", p.telephone)} ${fr("Email", p.email)} ${fr("Ville", p.ville)}
-      </div>
-      <div class="fiche-section" style="padding-left:20px">
-        <h3>Qualification</h3>
-        ${fr("Source", srcBadge(p.source))} ${fr("Apport", p.apport)}
-        ${fr("Note initiale", notePill(p.noteInitiale))} ${fr("Note actuelle", notePill(p.noteActuelle))}
-      </div>
-    </div>
-    <div class="fiche-section">
-      <h3>Suivi commercial</h3>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
-        <div>${fs("Contact", p.dateContact)}</div>
-        <div>${fs("Rappel", p.dateRappel)}</div>
-        <div>${fs("Présentation", p.presentation)}</div>
-        <div>${fs("Visio", p.dateVisio)}</div>
-      </div>
-    </div>
-    ${p.profil ? `<div class="fiche-section"><h3>Profil candidat</h3><div class="fiche-notes">${esc(p.profil)}</div></div>` : ""}
-    ${p.notes  ? `<div class="fiche-section"><h3>Notes complémentaires</h3><div class="fiche-notes">${esc(p.notes)}</div></div>` : ""}
-  `;
+// ── Fiche / Édition Prospect ──────────────────────────────────────────────
+let currentEditIdx = null;
+
+function openFiche(idx) {
+  const p = allData[parseInt(idx)];
+  if (!p) return;
+  currentEditIdx = parseInt(idx);
+  document.getElementById("fiche-title").textContent = p.prospect || "Prospect";
+
+  // Remplir les champs du formulaire
+  document.getElementById("e-prospect").value    = p.prospect    || "";
+  document.getElementById("e-telephone").value   = p.telephone   || "";
+  document.getElementById("e-email").value        = p.email       || "";
+  document.getElementById("e-source").value       = p.source      || "";
+  document.getElementById("e-apport").value       = p.apport      || "";
+  document.getElementById("e-ville").value        = String(p.ville || "");
+  document.getElementById("e-presentation").value = p.presentation || "";
+  document.getElementById("e-noteInitiale").value = p.noteInitiale ?? 0;
+  document.getElementById("e-noteActuelle").value = p.noteActuelle ?? 0;
+  document.getElementById("e-statut").value       = p.statut || "Actif";
+  document.getElementById("e-profil").value       = p.profil || "";
+  document.getElementById("e-notes").value        = p.notes  || "";
+
+  // Dates : convertir DD/MM/YYYY → YYYY-MM-DD pour input[type=date]
+  document.getElementById("e-dateContact").value = toInputDate(p.dateContact);
+  document.getElementById("e-dateRappel").value  = toInputDate(p.dateRappel);
+  document.getElementById("e-dateVisio").value   = toInputDate(p.dateVisio);
+
   document.getElementById("fiche-modal").classList.add("open");
 }
 
-function fr(label, val) {
-  if (!val) return "";
-  return `<div class="fiche-row"><span class="fl">${label}</span><span class="fv">${val}</span></div>`;
+function toInputDate(str) {
+  if (!str) return "";
+  const parts = str.split("/");
+  if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
+  return "";
 }
-function fs(label, val) {
-  return `<div style="font-size:11px;color:var(--muted);margin-bottom:2px">${label}</div>
-          <div style="font-size:13px;font-weight:500">${val || "—"}</div>`;
+
+function fromInputDate(str) {
+  if (!str) return "";
+  const parts = str.split("-");
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return "";
 }
-function notePill(n) {
-  return `<span class="note-pill note-${n}" style="display:inline-flex">${n}</span>`;
+
+async function updateProspect() {
+  const p = allData[currentEditIdx];
+  if (!p) return;
+
+  const btn = document.getElementById("btn-update");
+  btn.disabled = true;
+  btn.textContent = "Enregistrement…";
+
+  const payload = {
+    action       : "update",
+    _rowIndex    : p._rowIndex,
+    prospect     : document.getElementById("e-prospect").value.trim(),
+    telephone    : document.getElementById("e-telephone").value.trim(),
+    email        : document.getElementById("e-email").value.trim(),
+    source       : document.getElementById("e-source").value,
+    apport       : document.getElementById("e-apport").value.trim(),
+    ville        : document.getElementById("e-ville").value.trim(),
+    dateContact  : fromInputDate(document.getElementById("e-dateContact").value),
+    dateRappel   : fromInputDate(document.getElementById("e-dateRappel").value),
+    presentation : document.getElementById("e-presentation").value.trim(),
+    dateVisio    : fromInputDate(document.getElementById("e-dateVisio").value),
+    noteInitiale : parseInt(document.getElementById("e-noteInitiale").value) || 0,
+    noteActuelle : parseInt(document.getElementById("e-noteActuelle").value) || 0,
+    profil       : document.getElementById("e-profil").value.trim(),
+    notes        : document.getElementById("e-notes").value.trim(),
+    statut       : document.getElementById("e-statut").value,
+  };
+
+  try {
+    const res  = await fetch(APPS_SCRIPT_URL, { method: "POST", body: JSON.stringify(payload) });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error);
+
+    // Mettre à jour localement sans recharger toute la page
+    Object.assign(allData[currentEditIdx], payload);
+    showToast("Modifications enregistrées ✓", "success");
+    closeFiche();
+    applyFilters();
+  } catch(e) {
+    showToast("Erreur : " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Enregistrer les modifications";
+  }
 }
-function closeFiche() { document.getElementById("fiche-modal").classList.remove("open"); }
+
+function closeFiche() { document.getElementById("fiche-modal").classList.remove("open"); currentEditIdx = null; }
 
 // ── Add Prospect Modal ────────────────────────────────────────────────────
 function openAddModal()  { document.getElementById("add-modal").classList.add("open"); }
