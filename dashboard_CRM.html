@@ -55,6 +55,15 @@
   .kpi.orange .kpi-value { color: var(--orange); }
   .kpi.amber .kpi-value { color: var(--amber); }
   .kpi-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .kpi { cursor: pointer; transition: transform .1s, box-shadow .1s; }
+  .kpi:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+  .kpi.active { outline: 2px solid currentColor; outline-offset: 2px; }
+  .kpi.blue.active { outline-color: var(--accent); }
+  .kpi.green.active { outline-color: var(--green); }
+  .kpi.red.active { outline-color: var(--red); }
+  .kpi.orange.active { outline-color: var(--orange); }
+  .kpi.amber.active { outline-color: var(--amber); }
+  .kpi-hint { font-size: 10px; color: var(--muted); margin-top: 6px; opacity: .6; }
 
   /* ── Charts row ── */
   .charts-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
@@ -195,11 +204,11 @@
   <div id="app" style="display:none">
     <!-- KPIs -->
     <div class="kpi-grid">
-      <div class="kpi blue"><div class="kpi-label">Total prospects</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub">dans la base</div></div>
-      <div class="kpi green"><div class="kpi-label">Notes élevées (≥4)</div><div class="kpi-value" id="kpi-high">—</div><div class="kpi-sub">prospects chauds</div></div>
-      <div class="kpi red"><div class="kpi-label">Rappels en retard</div><div class="kpi-value" id="kpi-late">—</div><div class="kpi-sub">à traiter</div></div>
-      <div class="kpi orange"><div class="kpi-label">Rappels cette semaine</div><div class="kpi-value" id="kpi-week">—</div><div class="kpi-sub">7 prochains jours</div></div>
-      <div class="kpi amber"><div class="kpi-label">Visios planifiées</div><div class="kpi-value" id="kpi-visio">—</div><div class="kpi-sub">rendez-vous</div></div>
+      <div class="kpi blue" id="kpi-card-all" onclick="kpiFilter('all')"><div class="kpi-label">Total prospects</div><div class="kpi-value" id="kpi-total">—</div><div class="kpi-sub">dans la base</div><div class="kpi-hint">Cliquer pour tout afficher</div></div>
+      <div class="kpi green" id="kpi-card-high" onclick="kpiFilter('high')"><div class="kpi-label">Notes élevées (≥4)</div><div class="kpi-value" id="kpi-high">—</div><div class="kpi-sub">prospects chauds</div><div class="kpi-hint">Cliquer pour filtrer</div></div>
+      <div class="kpi red" id="kpi-card-late" onclick="kpiFilter('late')"><div class="kpi-label">Rappels en retard</div><div class="kpi-value" id="kpi-late">—</div><div class="kpi-sub">à traiter</div><div class="kpi-hint">Cliquer pour filtrer</div></div>
+      <div class="kpi orange" id="kpi-card-week" onclick="kpiFilter('week')"><div class="kpi-label">Rappels cette semaine</div><div class="kpi-value" id="kpi-week">—</div><div class="kpi-sub">7 prochains jours</div><div class="kpi-hint">Cliquer pour filtrer</div></div>
+      <div class="kpi amber" id="kpi-card-visio" onclick="kpiFilter('visio')"><div class="kpi-label">Visios planifiées</div><div class="kpi-value" id="kpi-visio">—</div><div class="kpi-sub">rendez-vous</div><div class="kpi-hint">Cliquer pour filtrer</div></div>
     </div>
 
     <!-- Charts -->
@@ -367,6 +376,7 @@ let sortField = "prospect";
 let sortAsc = true;
 let page = 0;
 const PAGE_SIZE = 25;
+let activeKpiFilter = "all";
 
 // ── Init ──────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
@@ -418,6 +428,20 @@ function buildUI() {
   populateFilters();
   applyFilters();
   try { buildCharts(); } catch(e) { console.warn("Charts non disponibles:", e); }
+}
+
+// ── KPI filter ───────────────────────────────────────────────────────────
+function kpiFilter(type) {
+  activeKpiFilter = (activeKpiFilter === type && type !== "all") ? "all" : type;
+  document.querySelectorAll(".kpi").forEach(el => el.classList.remove("active"));
+  if (activeKpiFilter !== "all") {
+    document.getElementById("kpi-card-" + activeKpiFilter)?.classList.add("active");
+  } else {
+    document.getElementById("kpi-card-all")?.classList.add("active");
+  }
+  // Scroll to table
+  document.querySelector(".toolbar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  applyFilters();
 }
 
 // ── KPIs ─────────────────────────────────────────────────────────────────
@@ -514,7 +538,7 @@ function applyFilters() {
   const in7   = new Date(today); in7.setDate(today.getDate() + 7);
 
   filtered = allData.filter(p => {
-    if (q && !`${p.prospect} ${p.ville} ${p.email} ${p.source} ${p.apport}`.toLowerCase().includes(q)) return false;
+    if (q && !`${p.prospect} ${String(p.ville||"")} ${p.email} ${p.source} ${p.apport}`.toLowerCase().includes(q)) return false;
     if (src  && p.source !== src) return false;
     if (note && String(p.noteActuelle) !== note) return false;
     if (vil  && String(p.ville||"").trim() !== vil) return false;
@@ -526,6 +550,17 @@ function applyFilters() {
       const d = parseDate(p.dateRappel);
       if (!d || d < today || d > in7) return false;
     }
+    // KPI quick filter
+    if (activeKpiFilter === "high" && p.noteActuelle < 4) return false;
+    if (activeKpiFilter === "late") {
+      const d = parseDate(p.dateRappel);
+      if (!d || d >= today) return false;
+    }
+    if (activeKpiFilter === "week") {
+      const d = parseDate(p.dateRappel);
+      if (!d || d < today || d > in7) return false;
+    }
+    if (activeKpiFilter === "visio" && !p.dateVisio) return false;
     return true;
   });
 
