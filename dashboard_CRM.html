@@ -520,6 +520,11 @@ function kpiFilter(type) {
   if (activeKpiFilter !== "all") {
     document.getElementById("kpi-card-" + activeKpiFilter)?.classList.add("active");
   }
+  // Synchroniser le select filterRappel avec la KPI active
+  const rappelSel = document.getElementById("filterRappel");
+  if (activeKpiFilter === "late")  rappelSel.value = "late";
+  else if (activeKpiFilter === "week") rappelSel.value = "week";
+  else rappelSel.value = "";
   applyFilters();
 }
 
