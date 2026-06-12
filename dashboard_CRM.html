@@ -312,17 +312,7 @@
         </div>
         <div class="form-group">
           <label>Source</label>
-          <select id="f-source">
-            <option value="">— Choisir —</option>
-            <option>Franchise Direct</option>
-            <option>WordPress</option>
-            <option>Toute la Franchise</option>
-            <option>Les Rencontres Digitales</option>
-            <option>Direct</option>
-            <option>L'Express Franchise</option>
-            <option>Franchise Expo Salon</option>
-            <option>Reussir Franchise</option>
-          </select>
+          <input type="text" id="f-source" list="sources-list" placeholder="Choisir ou saisir une nouvelle source…" autocomplete="off">
         </div>
         <div class="form-group">
           <label>Apport / Budget</label>
@@ -378,13 +368,7 @@
         <div class="form-group"><label>Téléphone</label><input type="text" id="e-telephone"></div>
         <div class="form-group"><label>Email</label><input type="email" id="e-email"></div>
         <div class="form-group"><label>Source</label>
-          <select id="e-source">
-            <option value="">— Choisir —</option>
-            <option>Franchise Direct</option><option>WordPress</option>
-            <option>Toute la Franchise</option><option>Les Rencontres Digitales</option>
-            <option>Direct</option><option>L'Express Franchise</option>
-            <option>Franchise Expo Salon</option><option>Reussir Franchise</option>
-          </select>
+          <input type="text" id="e-source" list="sources-list" placeholder="Choisir ou saisir une nouvelle source…" autocomplete="off">
         </div>
         <div class="form-group"><label>Apport / Budget</label><input type="text" id="e-apport"></div>
         <div class="form-group"><label>Ville / Région</label><input type="text" id="e-ville"></div>
@@ -411,6 +395,7 @@
   </div>
 </div>
 
+<datalist id="sources-list"></datalist>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -628,6 +613,10 @@ function buildCharts() {
 function populateFilters() {
   const sources = [...new Set(allData.map(p => p.source).filter(Boolean))].sort();
   const villes  = [...new Set(allData.map(p => String(p.ville||"").trim()).filter(Boolean))].sort();
+
+  // Datalist pour les champs source (ajout + édition)
+  const dl = document.getElementById("sources-list");
+  dl.innerHTML = sources.map(s => `<option value="${s}">`).join("");
   const fSrc = document.getElementById("filterSource");
   const fVil = document.getElementById("filterVille");
   sources.forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = s; fSrc.appendChild(o); });
@@ -901,7 +890,7 @@ function resetForm() {
   ["f-prospect","f-telephone","f-email","f-apport","f-ville","f-profil","f-notes"].forEach(id => {
     document.getElementById(id).value = "";
   });
-  document.getElementById("f-source").value = "";
+  document.getElementById("f-source").value  = "";
   document.getElementById("f-dateContact").value = new Date().toISOString().split("T")[0];
   document.getElementById("f-dateRappel").value = "";
   document.getElementById("f-noteInitiale").value = "0";
