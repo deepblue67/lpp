@@ -57,7 +57,14 @@
     .metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;}
     .metric-item{background:var(--indigo-pale);border-radius:9px;padding:9px 11px;}
     .metric-item.full{grid-column:1/-1;}
-    .metric-label{font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+    .metric-label{font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;display:flex;align-items:center;gap:4px;}
+    .tip-wrap{position:relative;display:inline-flex;align-items:center;}
+    .tip-icon{width:13px;height:13px;border-radius:50%;background:var(--indigo-mid);color:#fff;font-size:8px;font-weight:700;font-style:normal;display:inline-flex;align-items:center;justify-content:center;cursor:default;flex-shrink:0;line-height:1;}
+    .tip-box{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;line-height:1.45;padding:7px 10px;border-radius:7px;width:200px;white-space:normal;pointer-events:none;opacity:0;transition:opacity .15s;z-index:99;box-shadow:0 4px 12px rgba(0,0,0,.3);}
+    .tip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#1e293b;}
+    .tip-wrap:hover .tip-box{opacity:1;}
+    .gauge-badge-wrap{position:relative;display:inline-block;}
+    .gauge-badge-wrap .tip-box{bottom:calc(100% + 8px);}
     .metric-value{font-size:13px;font-weight:700;color:var(--text);line-height:1.2;}
     .ecart-pos{background:#D4EDDA;}
     .ecart-pos .metric-label,.ecart-pos .metric-value{color:#155724;}
@@ -291,23 +298,23 @@ function buildBlock(site, last, slots, currRow) {
         ${makeGaugeSVG(gaugePct, color)}
         <div class="metric-grid">
           <div class="metric-item">
-            <div class="metric-label">Moy/j N-1</div>
+            <div class="metric-label">Moy/j N-1 <span class="tip-wrap"><i class="tip-icon">i</i><span class="tip-box">CA HT du mois N-1 ÷ nb jours travaillés N-1 = CA moyen par jour de l'année précédente</span></span></div>
             <div class="metric-value">${fmtE(moyN1)}</div>
           </div>
           <div class="metric-item">
-            <div class="metric-label">Moy/j N</div>
+            <div class="metric-label">Moy/j N <span class="tip-wrap"><i class="tip-icon">i</i><span class="tip-box">CA HT du mois N ÷ nb jours travaillés N = CA moyen par jour de l'année en cours</span></span></div>
             <div class="metric-value">${fmtE(moyN)}</div>
           </div>
           <div class="metric-item" style="background:${color}18;border:1.5px solid ${color}44">
-            <div class="metric-label" style="color:${color}">Objectif N</div>
+            <div class="metric-label" style="color:${color}">Objectif N <span class="tip-wrap"><i class="tip-icon">i</i><span class="tip-box">Moy/j N-1 × nb jours travaillés N = CA total à atteindre pour égaler la performance N-1</span></span></div>
             <div class="metric-value" style="color:${color}">${fmtE(objectif)}</div>
           </div>
           <div class="metric-item">
-            <div class="metric-label">CA réel N</div>
+            <div class="metric-label">CA réel N <span class="tip-wrap"><i class="tip-icon">i</i><span class="tip-box">CA HT total réalisé sur le mois en cours (source : HISTORIQUE CA HT)</span></span></div>
             <div class="metric-value">${currCA !== null ? fmtE(currCA) : '—'}</div>
           </div>
           <div class="metric-item full ${ecartCls}">
-            <div class="metric-label">Écart vs objectif</div>
+            <div class="metric-label">Écart vs objectif <span class="tip-wrap"><i class="tip-icon">i</i><span class="tip-box">CA réel N − Objectif N = différence entre réalisé et objectif (en € et en %)</span></span></div>
             <div class="metric-value">${ecartStr}</div>
           </div>
         </div>
@@ -401,18 +408,22 @@ function makeGaugeSVG(pct) {
   const [m1x,m1y] = pt(marker100deg, Ri - 4);
   const [m2x,m2y] = pt(marker100deg, Ro + 4);
 
-  // Badge with % value
+  // Badge with % value (HTML overlay for CSS tooltip support)
   const display = pct === null ? '—' : pct.toFixed(1) + '%';
-  const badgeW = 54, badgeH = 22;
-  const bx = cx - badgeW / 2, by = cy + 22;
 
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block;margin:0 auto">
-    ${segs}
-    <line x1="${f(m1x)}" y1="${f(m1y)}" x2="${f(m2x)}" y2="${f(m2y)}" stroke="white" stroke-width="2.5" stroke-dasharray="4,3" opacity="0.9"/>
-    ${needle}
-    <rect x="${bx}" y="${by}" width="${badgeW}" height="${badgeH}" rx="5" fill="#1A2440"/>
-    <text x="${cx}" y="${by + 15}" text-anchor="middle" font-size="12" font-weight="800" fill="white" font-family="Inter">${display}</text>
-  </svg>`;
+  return `<div style="position:relative;text-align:center;">
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block;margin:0 auto">
+      ${segs}
+      <line x1="${f(m1x)}" y1="${f(m1y)}" x2="${f(m2x)}" y2="${f(m2y)}" stroke="white" stroke-width="2.5" stroke-dasharray="4,3" opacity="0.9"/>
+      ${needle}
+    </svg>
+    <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);">
+      <span class="tip-wrap">
+        <span style="display:inline-block;background:#1A2440;color:white;font-size:12px;font-weight:800;border-radius:5px;padding:3px 10px;cursor:default;font-family:Inter,sans-serif">${display}</span>
+        <span class="tip-box" style="width:220px">CA réel N ÷ Objectif N × 100 — mesure l'avancement du mois par rapport à l'objectif théorique (100 % = objectif atteint)</span>
+      </span>
+    </div>
+  </div>`;
 }
 
 // ── Graphique (barres ou courbes, CA ou moy/jour) ─────────────────────────────
