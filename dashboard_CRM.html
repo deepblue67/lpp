@@ -433,13 +433,18 @@ function buildUI() {
 // ── KPI filter ───────────────────────────────────────────────────────────
 function kpiFilter(type) {
   activeKpiFilter = (activeKpiFilter === type && type !== "all") ? "all" : type;
+  if (type === "all") {
+    document.getElementById("search").value = "";
+    document.getElementById("filterSource").value = "";
+    document.getElementById("filterNote").value = "";
+    document.getElementById("filterVille").value = "";
+    document.getElementById("filterRappel").value = "";
+    activeKpiFilter = "all";
+  }
   document.querySelectorAll(".kpi").forEach(el => el.classList.remove("active"));
   if (activeKpiFilter !== "all") {
     document.getElementById("kpi-card-" + activeKpiFilter)?.classList.add("active");
-  } else {
-    document.getElementById("kpi-card-all")?.classList.add("active");
   }
-  // Scroll to table
   document.querySelector(".toolbar")?.scrollIntoView({ behavior: "smooth", block: "start" });
   applyFilters();
 }
