@@ -541,7 +541,7 @@ function buildCharts() {
     if (sel.value === label) { sel.value = ""; }
     else { sel.value = label; }
     applyFn();
-    document.querySelector(".toolbar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+
   }
 
   const chartSrc = new Chart(document.getElementById("chartSource"), {
