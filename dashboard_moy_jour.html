@@ -172,38 +172,71 @@ function applyFilters() {
   renderAll(n);
 }
 
+// ── Calcul des N mois glissants depuis aujourd'hui ────────────────────────────
+function getTodaySortKey() {
+  const now = new Date();
+  return now.getFullYear() * 100 + (now.getMonth() + 1);
+}
+
+function buildMonthSlots(n) {
+  // Génère n sortKeys consécutifs se terminant au mois courant (date système)
+  const now = new Date();
+  let y = now.getFullYear(), m = now.getMonth() + 1;
+  const slots = [];
+  for (let i = 0; i < n; i++) {
+    slots.unshift(y * 100 + m); // du plus récent au plus ancien → unshift pour ordre chronologique
+    m--;
+    if (m === 0) { m = 12; y--; }
+  }
+  return slots; // tableau trié du plus ancien au plus récent
+}
+
 // ── Rendu principal ───────────────────────────────────────────────────────────
 function renderAll(n) {
-  const allKeys = [...new Set(rawData.map(r => r.sortKey))].sort((a,b)=>a-b);
-  const lastNKeys = new Set(allKeys.slice(-n));
-  const last = rawData.filter(r => lastNKeys.has(r.sortKey));
+  const slots = buildMonthSlots(n); // n sortKeys ancrés sur aujourd'hui
+  // Pour chaque slot, trouver la ligne de données correspondante (ou null)
+  const last = slots.map(key => rawData.find(r => r.sortKey === key) || null);
+
+  // Mois en cours = slot le plus récent (= aujourd'hui)
+  // Pour la jauge : prendre la dernière ligne avec des données réelles
+  const currRow = rawData.find(r => r.sortKey === getTodaySortKey())
+    || rawData.slice().reverse().find(r => r.sortKey <= getTodaySortKey()) // mois le plus récent ≤ aujourd'hui
+    || rawData[rawData.length - 1];
 
   Object.values(CHARTS).forEach(c => c.destroy()); CHARTS = {};
 
-  document.getElementById('content').innerHTML = SITES.map(s => buildBlock(s, last)).join('');
-  SITES.forEach(s => renderChart(s, last));
+  document.getElementById('content').innerHTML = SITES.map(s => buildBlock(s, last, slots, currRow)).join('');
+  SITES.forEach(s => renderChart(s, last, slots));
 }
 
 // ── Bloc magasin ──────────────────────────────────────────────────────────────
-function buildBlock(site, last) {
+function buildBlock(site, last, slots, currRow) {
   const color = SITE_COLORS[site];
-  const curr = last[last.length - 1];
-  const prev = rawData.find(r => r.moisKey === curr.moisKey && r.calYear === curr.calYear - 1);
+  const curr = currRow; // ligne du mois en cours (date système), peut être null si pas encore de données
+  const prev = curr ? rawData.find(r => r.moisKey === curr.moisKey && r.calYear === curr.calYear - 1) : null;
 
   let gaugePct = null, moyN1 = null, objectif = null, moyN = null;
 
-  if (prev && prev.nb_jours > 0 && curr.nb_jours > 0) {
+  if (curr && prev && prev.nb_jours > 0 && curr.nb_jours > 0) {
     moyN1    = prev[site] / prev.nb_jours;
     objectif = moyN1 * curr.nb_jours;
     if (objectif > 0) gaugePct = (curr[site] / objectif) * 100;
   }
-  if (curr.nb_jours > 0) moyN = curr[site] / curr.nb_jours;
+  if (curr && curr.nb_jours > 0) moyN = curr[site] / curr.nb_jours;
 
-  const ecart    = objectif != null ? curr[site] - objectif : null;
+  const ecart    = (objectif != null && curr) ? curr[site] - objectif : null;
   const ecartCls = ecart === null ? '' : Math.abs(ecart/objectif) < 0.01 ? '' : ecart >= 0 ? 'ecart-pos' : 'ecart-neg';
   const ecartStr = ecart === null ? '—'
     : (ecart >= 0 ? '▲ +' : '▼ ') + fmt0(Math.abs(ecart)) + ' €'
     + (objectif > 0 ? ' (' + (ecart>=0?'+':'') + ((ecart/objectif)*100).toFixed(1) + '%)' : '');
+
+  // Label du mois en cours depuis la date système
+  const now = new Date();
+  const mNamesLong = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const todayLabel = mNamesLong[now.getMonth()] + ' ' + now.getFullYear();
+  const currMoisLabel = curr ? curr.mois : todayLabel + ' (aucune donnée)';
+  const currJours     = curr ? curr.nb_jours : 0;
+  const currCA        = curr ? curr[site] : null;
 
   return `
   <div class="site-block">
@@ -213,14 +246,16 @@ function buildBlock(site, last) {
         ${SITE_NAMES[site]}
       </div>
       <div class="site-meta">
-        <span>Mois en cours : <strong>${curr.mois}</strong></span>
-        <span class="days-badge" style="background:${color}">📅 ${curr.nb_jours} jour${curr.nb_jours>1?'s':''} travaillé${curr.nb_jours>1?'s':''} (N)</span>
+        <span>Mois en cours : <strong>${currMoisLabel}</strong></span>
+        ${curr
+          ? `<span class="days-badge" style="background:${color}">📅 ${currJours} jour${currJours>1?'s':''} travaillé${currJours>1?'s':''} (N)</span>`
+          : `<span class="days-badge" style="background:#aaa">📅 Pas encore de données</span>`}
         ${prev ? `<span style="background:${color}44;color:${color};padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">${prev.nb_jours}j N-1</span>` : '<span style="color:#ccc;font-size:11px">N-1 non disponible</span>'}
       </div>
     </div>
     <div class="site-body">
       <div class="gauge-panel">
-        <div class="gauge-title">Avancement ${curr.mois.split(' ')[0]}</div>
+        <div class="gauge-title">Avancement ${curr ? curr.mois.split(' ')[0] : todayLabel.split(' ')[0]}</div>
         ${makeGaugeSVG(gaugePct, color)}
         <div class="metric-grid">
           <div class="metric-item">
@@ -237,7 +272,7 @@ function buildBlock(site, last) {
           </div>
           <div class="metric-item">
             <div class="metric-label">CA réel N</div>
-            <div class="metric-value">${fmtE(curr[site])}</div>
+            <div class="metric-value">${currCA !== null ? fmtE(currCA) : '—'}</div>
           </div>
           <div class="metric-item full ${ecartCls}">
             <div class="metric-label">Écart vs objectif</div>
@@ -312,19 +347,30 @@ function makeGaugeSVG(pct, siteColor) {
 }
 
 // ── Graphique barres ──────────────────────────────────────────────────────────
-function renderChart(site, last) {
+function renderChart(site, last, slots) {
   const ctx = document.getElementById('chart-' + site);
   if (!ctx) return;
 
   const color = SITE_COLORS[site];
   const labels = [], dataN = [], dataN1 = [], metaN = [], metaN1 = [];
+  const todayKey = getTodaySortKey();
 
-  for (const row of last) {
-    const parts = row.mois.split(' ');
-    labels.push(parts[0].slice(0,3) + " '" + (parts[1]||'').slice(2));
-    dataN.push(row[site] || 0);
-    metaN.push(row);
-    const prev = rawData.find(r => r.moisKey === row.moisKey && r.calYear === row.calYear - 1);
+  // Construire les labels depuis les slots (ancrés sur la date système)
+  for (let i = 0; i < slots.length; i++) {
+    const key = slots[i];
+    const row = last[i]; // peut être null si pas de données ce mois-là
+
+    // Label : ex. "Jun '26"
+    const y = Math.floor(key / 100), m = key % 100;
+    const mNames = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+    labels.push(mNames[m-1] + " '" + String(y).slice(2));
+
+    // Données N
+    dataN.push(row ? (row[site] || 0) : null);
+    metaN.push(row || null);
+
+    // Données N-1 : même moisKey, calYear-1
+    const prev = row ? rawData.find(r => r.moisKey === row.moisKey && r.calYear === row.calYear - 1) : null;
     dataN1.push(prev ? (prev[site] || 0) : null);
     metaN1.push(prev || null);
   }
