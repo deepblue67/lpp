@@ -80,6 +80,8 @@
   select.filter { padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; background: var(--surface); color: var(--text); cursor: pointer; outline: none; }
   select.filter:focus { border-color: var(--accent); }
   .badge-count { background: var(--accent-light); color: var(--accent); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
+  .btn-reset { background: none; border: 1px solid var(--border); border-radius: var(--radius-sm); width: 34px; height: 34px; font-size: 15px; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .15s; }
+  .btn-reset:hover { background: var(--red-light); border-color: var(--red); color: var(--red); }
 
   /* ── Table ── */
   .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
@@ -254,6 +256,7 @@
         <option value="Inactif">Inactif</option>
       </select>
       <span class="badge-count" id="result-count">— résultats</span>
+      <button class="btn-reset" id="btn-reset" onclick="resetAllFilters()" title="Réinitialiser tous les filtres">✕</button>
     </div>
 
     <div class="table-wrap">
@@ -475,23 +478,30 @@ function buildUI() {
   try { buildCharts(); } catch(e) { console.warn("Charts non disponibles:", e); }
 }
 
+// ── Reset tous les filtres ────────────────────────────────────────────────
+function resetAllFilters() {
+  document.getElementById("search").value = "";
+  document.getElementById("filterSource").value = "";
+  document.getElementById("filterNote").value = "";
+  document.getElementById("filterVille").value = "";
+  document.getElementById("filterRappel").value = "";
+  document.getElementById("filterStatut").value = "";
+  activeKpiFilter = "all";
+  document.querySelectorAll(".kpi").forEach(el => el.classList.remove("active"));
+  applyFilters();
+}
+
 // ── KPI filter ───────────────────────────────────────────────────────────
 function kpiFilter(type) {
   activeKpiFilter = (activeKpiFilter === type && type !== "all") ? "all" : type;
   if (type === "all") {
-    document.getElementById("search").value = "";
-    document.getElementById("filterSource").value = "";
-    document.getElementById("filterNote").value = "";
-    document.getElementById("filterVille").value = "";
-    document.getElementById("filterRappel").value = "";
-    document.getElementById("filterStatut").value = "";
-    activeKpiFilter = "all";
+    resetAllFilters();
+    return;
   }
   document.querySelectorAll(".kpi").forEach(el => el.classList.remove("active"));
   if (activeKpiFilter !== "all") {
     document.getElementById("kpi-card-" + activeKpiFilter)?.classList.add("active");
   }
-  document.querySelector(".toolbar")?.scrollIntoView({ behavior: "smooth", block: "start" });
   applyFilters();
 }
 
@@ -590,7 +600,6 @@ function buildCharts() {
         const sel = document.getElementById("filterNote");
         sel.value = (sel.value === noteVal) ? "" : noteVal;
         applyFilters();
-        document.querySelector(".toolbar")?.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }
   });
