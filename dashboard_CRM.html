@@ -415,9 +415,9 @@ function buildUI() {
   document.getElementById("loading").style.display = "none";
   document.getElementById("app").style.display = "block";
   updateKPIs();
-  buildCharts();
   populateFilters();
   applyFilters();
+  try { buildCharts(); } catch(e) { console.warn("Charts non disponibles:", e); }
 }
 
 // ── KPIs ─────────────────────────────────────────────────────────────────
