@@ -335,8 +335,25 @@
           <input type="date" id="f-dateContact">
         </div>
         <div class="form-group">
+          <label>Type de contact</label>
+          <select id="f-typeContact">
+            <option value="">—</option>
+            <option value="Téléphone">Téléphone</option>
+            <option value="Mail">Mail</option>
+            <option value="Rencontre">Rencontre</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Date de rappel</label>
           <input type="date" id="f-dateRappel">
+        </div>
+        <div class="form-group">
+          <label>Présentation envoyée</label>
+          <input type="date" id="f-presentation">
+        </div>
+        <div class="form-group">
+          <label>Date visio</label>
+          <input type="date" id="f-dateVisio">
         </div>
         <div class="form-group">
           <label>Note initiale (0–5)</label>
@@ -345,15 +362,6 @@
         <div class="form-group">
           <label>Note actuelle (0–5)</label>
           <input type="number" id="f-noteActuelle" min="0" max="5" value="0">
-        </div>
-        <div class="form-group">
-          <label>Type de contact</label>
-          <select id="f-typeContact">
-            <option value="">—</option>
-            <option value="Téléphone">Téléphone</option>
-            <option value="Mail">Mail</option>
-            <option value="Rencontre">Rencontre</option>
-          </select>
         </div>
         <div class="form-group full">
           <label>Profil candidat</label>
@@ -390,8 +398,16 @@
         <div class="form-group"><label>Apport / Budget</label><input type="text" id="e-apport"></div>
         <div class="form-group"><label>Ville / Région</label><input type="text" id="e-ville"></div>
         <div class="form-group"><label>Date de contact</label><input type="date" id="e-dateContact"></div>
+        <div class="form-group"><label>Type de contact</label>
+          <select id="e-typeContact">
+            <option value="">—</option>
+            <option value="Téléphone">Téléphone</option>
+            <option value="Mail">Mail</option>
+            <option value="Rencontre">Rencontre</option>
+          </select>
+        </div>
         <div class="form-group"><label>Date de rappel</label><input type="date" id="e-dateRappel"></div>
-        <div class="form-group"><label>Présentation envoyée</label><input type="text" id="e-presentation"></div>
+        <div class="form-group"><label>Présentation envoyée</label><input type="date" id="e-presentation"></div>
         <div class="form-group"><label>Date visio</label><input type="date" id="e-dateVisio"></div>
         <div class="form-group"><label>Note initiale (0–5)</label><input type="number" id="e-noteInitiale" min="0" max="5"></div>
         <div class="form-group"><label>Note actuelle (0–5)</label><input type="number" id="e-noteActuelle" min="0" max="5"></div>
@@ -399,14 +415,6 @@
           <select id="e-statut">
             <option value="Actif">Actif</option>
             <option value="Inactif">Inactif</option>
-          </select>
-        </div>
-        <div class="form-group"><label>Type de contact</label>
-          <select id="e-typeContact">
-            <option value="">—</option>
-            <option value="Téléphone">Téléphone</option>
-            <option value="Mail">Mail</option>
-            <option value="Rencontre">Rencontre</option>
           </select>
         </div>
         <div class="form-group full"><label>Profil candidat</label><textarea id="e-profil"></textarea></div>
@@ -793,7 +801,7 @@ function openFiche(idx) {
   document.getElementById("e-source").value       = p.source      || "";
   document.getElementById("e-apport").value       = p.apport      || "";
   document.getElementById("e-ville").value        = String(p.ville || "");
-  document.getElementById("e-presentation").value = p.presentation || "";
+  document.getElementById("e-presentation").value = toInputDate(p.presentation);
   document.getElementById("e-noteInitiale").value = p.noteInitiale ?? 0;
   document.getElementById("e-noteActuelle").value = p.noteActuelle ?? 0;
   document.getElementById("e-statut").value       = p.statut || "Actif";
@@ -811,8 +819,20 @@ function openFiche(idx) {
 
 function toInputDate(str) {
   if (!str) return "";
-  const parts = str.split("/");
-  if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
+  // Format dd/MM/yyyy → yyyy-MM-dd
+  const slash = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) return `${slash[3]}-${slash[2].padStart(2,"0")}-${slash[1].padStart(2,"0")}`;
+  // Format déjà yyyy-MM-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  // Chaîne de date JS type "Thu May 22 2025 09:00:00 GMT+0200..."
+  try {
+    const d = new Date(str);
+    if (!isNaN(d)) {
+      const dd = String(d.getDate()).padStart(2,"0");
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      return `${d.getFullYear()}-${mm}-${dd}`;
+    }
+  } catch(e) {}
   return "";
 }
 
@@ -842,7 +862,7 @@ async function updateProspect() {
     ville        : document.getElementById("e-ville").value.trim(),
     dateContact  : fromInputDate(document.getElementById("e-dateContact").value),
     dateRappel   : fromInputDate(document.getElementById("e-dateRappel").value),
-    presentation : document.getElementById("e-presentation").value.trim(),
+    presentation : fromInputDate(document.getElementById("e-presentation").value),
     dateVisio    : fromInputDate(document.getElementById("e-dateVisio").value),
     noteInitiale : parseInt(document.getElementById("e-noteInitiale").value) || 0,
     noteActuelle : parseInt(document.getElementById("e-noteActuelle").value) || 0,
@@ -895,6 +915,8 @@ async function submitProspect() {
     dateRappel  : document.getElementById("f-dateRappel").value,
     noteInitiale: parseInt(document.getElementById("f-noteInitiale").value) || 0,
     noteActuelle: parseInt(document.getElementById("f-noteActuelle").value) || 0,
+    presentation: fromInputDate(document.getElementById("f-presentation").value),
+    dateVisio   : fromInputDate(document.getElementById("f-dateVisio").value),
     profil      : document.getElementById("f-profil").value.trim(),
     notes       : document.getElementById("f-notes").value.trim(),
     typeContact : document.getElementById("f-typeContact").value,
