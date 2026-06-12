@@ -63,6 +63,9 @@
     .ecart-pos .metric-label,.ecart-pos .metric-value{color:#155724;}
     .ecart-neg{background:#F8D7DA;}
     .ecart-neg .metric-label,.ecart-neg .metric-value{color:#721C24;}
+    .toggle-btn{border:1.5px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;background:#fff;color:var(--text-light);transition:all .15s;white-space:nowrap;}
+    .toggle-btn.active{background:var(--indigo-mid);color:#fff;border-color:var(--indigo-mid);}
+    .toggle-btn:hover:not(.active){background:var(--indigo-pale);border-color:var(--indigo-mid);}
     .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;gap:16px;color:var(--text-light);}
     .spinner{width:36px;height:36px;border:3px solid var(--indigo-light);border-top-color:var(--navy);border-radius:50%;animation:spin .8s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg);}}
@@ -129,6 +132,32 @@ const MOIS_NUM = {octobre:10,novembre:11,décembre:12,janvier:1,février:2,mars:
 
 let rawData = [];
 let CHARTS = {};
+let chartSlots = []; // slots courants, mémorisés pour re-render ciblé
+let chartLast  = []; // last courant
+
+// État des toggles par magasin (type: 'bar'|'line', metric: 'ca'|'moy')
+const chartType   = {Lingo:'bar',  Stras:'bar',  Eckbo:'bar',  Schilic:'bar',  Illkirch:'bar'};
+const chartMetric = {Lingo:'ca',   Stras:'ca',   Eckbo:'ca',   Schilic:'ca',   Illkirch:'ca'};
+
+function setChartType(site, type) {
+  chartType[site] = type;
+  ['bar','line'].forEach(t => {
+    const btn = document.getElementById(`btn-type-${t}-${site}`);
+    if (btn) btn.classList.toggle('active', t === type);
+  });
+  if (CHARTS[site]) { CHARTS[site].destroy(); delete CHARTS[site]; }
+  renderChart(site, chartLast, chartSlots);
+}
+
+function setChartMetric(site, metric) {
+  chartMetric[site] = metric;
+  ['ca','moy'].forEach(m => {
+    const btn = document.getElementById(`btn-metric-${m}-${site}`);
+    if (btn) btn.classList.toggle('active', m === metric);
+  });
+  if (CHARTS[site]) { CHARTS[site].destroy(); delete CHARTS[site]; }
+  renderChart(site, chartLast, chartSlots);
+}
 
 const fmt0 = n => (isNaN(n)||n===null) ? '—' : Math.round(n).toLocaleString('fr-FR');
 const fmtE = n => fmt0(n) === '—' ? '—' : fmt0(n) + ' €';
@@ -202,6 +231,9 @@ function renderAll(n) {
   const currRow = rawData.find(r => r.sortKey === getTodaySortKey())
     || rawData.slice().reverse().find(r => r.sortKey <= getTodaySortKey()) // mois le plus récent ≤ aujourd'hui
     || rawData[rawData.length - 1];
+
+  chartLast  = last;
+  chartSlots = slots;
 
   Object.values(CHARTS).forEach(c => c.destroy()); CHARTS = {};
 
@@ -281,168 +313,194 @@ function buildBlock(site, last, slots, currRow) {
         </div>
       </div>
       <div class="chart-panel">
-        <div class="chart-subtitle">CA HT par mois — N-1 (référence) vs N (réel) · Survoler pour détail jours + moy/jour</div>
-        <canvas id="chart-${site}" height="155"></canvas>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <div style="font-size:11px;color:var(--text-light)">Survoler pour détail jours + moy/jour</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <div style="display:flex;gap:3px;">
+              <button id="btn-type-bar-${site}"  class="toggle-btn active" onclick="setChartType('${site}','bar')">&#9646; Barres</button>
+              <button id="btn-type-line-${site}" class="toggle-btn"        onclick="setChartType('${site}','line')">&#8725; Courbes</button>
+            </div>
+            <div style="width:1px;height:22px;background:var(--border)"></div>
+            <div style="display:flex;gap:3px;">
+              <button id="btn-metric-ca-${site}"  class="toggle-btn active" onclick="setChartMetric('${site}','ca')">CA total</button>
+              <button id="btn-metric-moy-${site}" class="toggle-btn"        onclick="setChartMetric('${site}','moy')">Moy/jour</button>
+            </div>
+          </div>
+        </div>
+        <canvas id="chart-${site}" height="145"></canvas>
       </div>
     </div>
   </div>`;
 }
 
-// ── Jauge SVG ─────────────────────────────────────────────────────────────────
-function makeGaugeSVG(pct, siteColor) {
-  // Semi-circle: 0% at left (180°), 150% at right (0°)
-  // Standard math angles, SVG y-down: x = cx + r*cos(a), y = cy - r*sin(a)
-  const W = 250, H = 148;
-  const cx = 125, cy = 120;
-  const R = 90, rIn = 63;
-  const d = v => v.toFixed(2);
+// ── Jauge SVG (style compteur segmenté) ──────────────────────────────────────
+function makeGaugeSVG(pct) {
+  // Layout
+  const W = 240, H = 162;
+  const cx = 120, cy = 118;
+  const Ro = 96, Ri = 64; // outer / inner radius
 
-  const pctToRad = p => (1 - p/150) * Math.PI; // 0% → π (left), 150% → 0 (right)
-  const pt = (p, r) => [cx + r*Math.cos(pctToRad(p)), cy - r*Math.sin(pctToRad(p))];
+  // Sweep: 210° total, starting at 210° (lower-left), ending at 0° (right)
+  const START  = 210;   // degrees (math convention)
+  const SWEEP  = 210;   // total degrees
+  const N      = 14;    // segments
+  const GAP    = 3;     // degrees between segments
+  const MAX_PCT = 150;
+  const SEG_SWEEP = (SWEEP - (N - 1) * GAP) / N; // ≈ 12°
 
-  // Annular sector: outer arc CCW (sweep=0), inner arc CW (sweep=1)
-  const sector = (p1, p2, fill, stroke) => {
-    const [x1,y1]=pt(p1,R), [x2,y2]=pt(p2,R), [x3,y3]=pt(p2,rIn), [x4,y4]=pt(p1,rIn);
-    return `<path d="M${d(x1)},${d(y1)} A${R},${R} 0 0,0 ${d(x2)},${d(y2)} L${d(x3)},${d(y3)} A${rIn},${rIn} 0 0,1 ${d(x4)},${d(y4)} Z" fill="${fill}" stroke="${stroke}" stroke-width="0.5"/>`;
+  // Colors: red → orange → yellow → green (14 steps)
+  const COLORS = [
+    '#E82010','#EC3818','#EE5018',
+    '#F06828','#F28030',
+    '#F49C28','#F4B820',
+    '#EED020','#D4D020',
+    '#AACC28','#7AC038',
+    '#48B840','#28A848',
+    '#109050'
+  ];
+  const GRAY = '#DDE0EA';
+
+  const f = v => v.toFixed(2);
+  // Math angle → SVG point
+  const pt = (deg, r) => {
+    const rad = deg * Math.PI / 180;
+    return [cx + r * Math.cos(rad), cy - r * Math.sin(rad)];
   };
 
-  // Tick (line outward from arc)
-  const tick = (p, len, col, w) => {
-    const [x1,y1]=pt(p,R+1), [x2,y2]=pt(p,R+len);
-    return `<line x1="${d(x1)}" y1="${d(y1)}" x2="${d(x2)}" y2="${d(y2)}" stroke="${col}" stroke-width="${w}"/>`;
-  };
-  const tickLbl = (p, lbl, col, bold, rOff) => {
-    const [lx,ly]=pt(p,R+rOff);
-    return `<text x="${d(lx)}" y="${d(ly+3)}" text-anchor="middle" font-size="${bold?9:8}" font-weight="${bold?700:400}" fill="${col}" font-family="Inter">${lbl}</text>`;
+  // Annular sector path: outer arc CCW (sweep=0), inner arc CW (sweep=1)
+  const sector = (a1, a2) => {
+    const [x1,y1]=pt(a1,Ro), [x2,y2]=pt(a2,Ro), [x3,y3]=pt(a2,Ri), [x4,y4]=pt(a1,Ri);
+    return `M${f(x1)},${f(y1)} A${Ro},${Ro} 0 0,0 ${f(x2)},${f(y2)} L${f(x3)},${f(y3)} A${Ri},${Ri} 0 0,1 ${f(x4)},${f(y4)} Z`;
   };
 
-  const needleColor = pct === null ? '#bbb' : pct < 80 ? '#E05A4A' : pct < 100 ? '#E8A020' : '#28A745';
-  let needle = '', valText = '—';
+  // How many segments are filled?
+  const filled = pct === null ? 0 : Math.round((Math.min(Math.max(pct, 0), MAX_PCT) / MAX_PCT) * N);
 
-  if (pct !== null) {
-    const clamp = Math.min(Math.max(pct, 0), 152);
-    const [nx,ny] = pt(clamp, R-12);
-    valText = pct.toFixed(1) + '%';
-    needle = `
-      <line x1="${cx}" y1="${cy}" x2="${d(nx)}" y2="${d(ny)}" stroke="${needleColor}" stroke-width="4" stroke-linecap="round"/>
-      <circle cx="${cx}" cy="${cy}" r="9" fill="${needleColor}"/>
-      <circle cx="${cx}" cy="${cy}" r="4" fill="white"/>`;
+  let segs = '';
+  for (let i = 0; i < N; i++) {
+    const a1 = START - i * (SEG_SWEEP + GAP);
+    const a2 = a1 - SEG_SWEEP;
+    const color = i < filled ? COLORS[i] : GRAY;
+    segs += `<path d="${sector(a1, a2)}" fill="${color}" stroke="white" stroke-width="1.5"/>`;
   }
 
-  // 100% tick marker (green line across full width of arc)
-  const [m1x,m1y]=pt(100,rIn-2), [m2x,m2y]=pt(100,R+2);
+  // Needle
+  let needle = '';
+  const clamp = pct === null ? 0 : Math.min(Math.max(pct, 0), MAX_PCT);
+  const needleDeg = START - (clamp / MAX_PCT) * SWEEP;
+  const [ntx, nty] = pt(needleDeg, Ro - 8);
+  const [nox, noy] = pt(needleDeg + 180, 10); // small tail
+  needle = `
+    <line x1="${f(nox)}" y1="${f(noy)}" x2="${f(ntx)}" y2="${f(nty)}" stroke="#1A2440" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy}" r="8" fill="#1A2440"/>
+    <circle cx="${cx}" cy="${cy}" r="3.5" fill="white"/>`;
+
+  // 100% marker line (white dashed line at segment boundary)
+  const seg100 = Math.round((100 / MAX_PCT) * N); // ≈ segment index 9.3
+  const marker100deg = START - seg100 * (SEG_SWEEP + GAP) + GAP / 2;
+  const [m1x,m1y] = pt(marker100deg, Ri - 4);
+  const [m2x,m2y] = pt(marker100deg, Ro + 4);
+
+  // Badge with % value
+  const display = pct === null ? '—' : pct.toFixed(1) + '%';
+  const badgeW = 54, badgeH = 22;
+  const bx = cx - badgeW / 2, by = cy + 22;
 
   return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block;margin:0 auto">
-    ${sector(0,   80,  '#FCEAEA','#F5C6C6')}
-    ${sector(80,  100, '#FEF9E7','#FAE5A0')}
-    ${sector(100, 150, '#EBF7EE','#B8E5C5')}
-    <line x1="${d(m1x)}" y1="${d(m1y)}" x2="${d(m2x)}" y2="${d(m2y)}" stroke="#28A745" stroke-width="2" stroke-dasharray="3,2" opacity="0.8"/>
-    ${tick(0,   10, '#aaa', 1.5)} ${tickLbl(0,   '0%',    '#999', false, 22)}
-    ${tick(50,   7, '#ccc', 1)}   ${tickLbl(50,  '50%',   '#bbb', false, 20)}
-    ${tick(100, 12, '#28A745', 2.5)} ${tickLbl(100,'100%','#28A745',true, 26)}
-    ${tick(150, 10, '#aaa', 1.5)} ${tickLbl(150, '150%',  '#999', false, 22)}
+    ${segs}
+    <line x1="${f(m1x)}" y1="${f(m1y)}" x2="${f(m2x)}" y2="${f(m2y)}" stroke="white" stroke-width="2.5" stroke-dasharray="4,3" opacity="0.9"/>
     ${needle}
-    <text x="${cx}" y="${cy+22}" text-anchor="middle" font-size="20" font-weight="800" fill="${needleColor}" font-family="Inter">${valText}</text>
+    <rect x="${bx}" y="${by}" width="${badgeW}" height="${badgeH}" rx="5" fill="#1A2440"/>
+    <text x="${cx}" y="${by + 15}" text-anchor="middle" font-size="12" font-weight="800" fill="white" font-family="Inter">${display}</text>
   </svg>`;
 }
 
-// ── Graphique barres ──────────────────────────────────────────────────────────
+// ── Graphique (barres ou courbes, CA ou moy/jour) ─────────────────────────────
 function renderChart(site, last, slots) {
   const ctx = document.getElementById('chart-' + site);
   if (!ctx) return;
 
-  const color = SITE_COLORS[site];
-  const labels = [], dataN = [], dataN1 = [], metaN = [], metaN1 = [];
-  const todayKey = getTodaySortKey();
+  const color  = SITE_COLORS[site];
+  const type   = chartType[site]   || 'bar';
+  const metric = chartMetric[site] || 'ca';
+  const isMoy  = metric === 'moy';
+  const isLine = type === 'line';
 
-  // Construire les labels depuis les slots (ancrés sur la date système)
+  const labels = [], dataN = [], dataN1 = [], metaN = [], metaN1 = [];
+  const mNames = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
   for (let i = 0; i < slots.length; i++) {
     const key = slots[i];
-    const row = last[i]; // peut être null si pas de données ce mois-là
-
-    // Label : ex. "Jun '26"
+    const row = last[i];
     const y = Math.floor(key / 100), m = key % 100;
-    const mNames = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
     labels.push(mNames[m-1] + " '" + String(y).slice(2));
 
-    // Données N
-    dataN.push(row ? (row[site] || 0) : null);
-    metaN.push(row || null);
-
-    // Données N-1 : même moisKey, calYear-1
     const prev = row ? rawData.find(r => r.moisKey === row.moisKey && r.calYear === row.calYear - 1) : null;
-    dataN1.push(prev ? (prev[site] || 0) : null);
+    metaN.push(row || null);
     metaN1.push(prev || null);
+
+    // Valeur selon métrique
+    const val  = row  ? (isMoy && row.nb_jours  > 0 ? row[site]  / row.nb_jours  : (!isMoy ? row[site]  || 0 : null)) : null;
+    const val1 = prev ? (isMoy && prev.nb_jours > 0 ? prev[site] / prev.nb_jours : (!isMoy ? prev[site] || 0 : null)) : null;
+    dataN.push(val  !== null ? Math.round(val)  : null);
+    dataN1.push(val1 !== null ? Math.round(val1) : null);
   }
 
+  const labelN1 = isMoy ? 'N-1 moy/jour (réf.)' : 'N-1 CA total (réf.)';
+  const labelN  = isMoy ? 'N moy/jour (réel)'   : 'N CA total (réel)';
+  const yLabel  = isMoy ? v => fmt0(v) + ' €/j'  : v => fmtK(v);
+
+  const dsBase = { spanGaps: true, borderRadius: isLine ? 0 : 4, borderSkipped: false };
+
+  const ds1 = isLine
+    ? { ...dsBase, label:labelN1, data:dataN1, borderColor:color+'88', backgroundColor:color+'18',
+        borderWidth:2, borderDash:[5,4], fill:false, tension:.35, pointRadius:3, pointBorderColor:color+'88', pointBackgroundColor:'#fff' }
+    : { ...dsBase, label:labelN1, data:dataN1, backgroundColor:color+'44', borderColor:color+'70', borderWidth:1 };
+
+  const ds2 = isLine
+    ? { ...dsBase, label:labelN, data:dataN, borderColor:color, backgroundColor:color+'22',
+        borderWidth:2.5, fill:false, tension:.35, pointRadius:4, pointBackgroundColor:color }
+    : { ...dsBase, label:labelN, data:dataN, backgroundColor:color+'CC', borderColor:color, borderWidth:1.5 };
+
   CHARTS[site] = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'N-1 (référence)',
-          data: dataN1,
-          backgroundColor: color + '50',
-          borderColor: color + '80',
-          borderWidth: 1,
-          borderRadius: 4,
-          borderSkipped: false,
-        },
-        {
-          label: 'N (réel)',
-          data: dataN,
-          backgroundColor: color + 'CC',
-          borderColor: color,
-          borderWidth: 1.5,
-          borderRadius: 4,
-          borderSkipped: false,
-        },
-      ]
-    },
+    type: isLine ? 'line' : 'bar',
+    data: { labels, datasets: [ds1, ds2] },
     options: {
       responsive: true,
-      interaction: {mode: 'index', intersect: false},
+      interaction: { mode:'index', intersect:false },
       plugins: {
-        legend: {
-          position: 'top',
-          labels: {font: {family:'Inter',size:11}, padding:14, boxWidth:14, useBorderRadius:true, borderRadius:3}
-        },
+        legend: { position:'top', labels:{ font:{family:'Inter',size:11}, padding:14, boxWidth:14, useBorderRadius:true, borderRadius:3 } },
         tooltip: {
           callbacks: {
             label(c) {
-              const isN = c.datasetIndex === 1;
-              const row = isN ? metaN[c.dataIndex] : metaN1[c.dataIndex];
-              if (!row || c.raw === null) return ` ${c.dataset.label} : données N/A`;
-              const ca  = c.raw;
-              const j   = row.nb_jours;
-              const moy = j > 0 ? Math.round(ca / j) : null;
-              // Objectif line for N bar
-              let objLine = '';
+              const isN  = c.datasetIndex === 1;
+              const row  = isN ? metaN[c.dataIndex] : metaN1[c.dataIndex];
+              if (!row || c.raw === null) return ` ${c.dataset.label} : N/A`;
+              const ca   = row[site] || 0;
+              const j    = row.nb_jours;
+              const moy  = j > 0 ? Math.round(ca / j) : null;
+              const lines = [
+                ` ${c.dataset.label} : ${fmt0(c.raw)} €${isMoy ? '/j' : ''}`,
+                ` CA total : ${fmt0(ca)} €`,
+                ` Jours travaillés : ${j}`,
+                ` Moy/jour : ${moy !== null ? fmt0(moy) + ' €/j' : '—'}`,
+              ];
               if (isN) {
                 const prow = metaN1[c.dataIndex];
                 if (prow && prow.nb_jours > 0 && j > 0) {
-                  const obj = Math.round((prow[site] / prow.nb_jours) * j);
+                  const obj  = Math.round((prow[site] / prow.nb_jours) * j);
                   const diff = ca - obj;
-                  objLine = ` Objectif : ${fmt0(obj)} € | Écart : ${diff>=0?'+':''}${fmt0(diff)} €`;
+                  lines.push(` Objectif : ${fmt0(obj)} € | Écart : ${diff >= 0 ? '+' : ''}${fmt0(diff)} €`);
                 }
               }
-              return [
-                ` ${c.dataset.label} : ${fmt0(ca)} €`,
-                ` Jours travaillés : ${j}`,
-                ` Moy/jour : ${moy !== null ? fmt0(moy)+' €/j' : '—'}`,
-                ...(objLine ? [objLine] : []),
-              ];
+              return lines;
             }
           }
         }
       },
       scales: {
-        x: {grid:{display:false}, ticks:{font:{family:'Inter',size:10}}},
-        y: {
-          ticks: {font:{family:'Inter',size:10}, callback: v => fmtK(v)},
-          grid: {color:'#E8EDF8'}
-        }
+        x: { grid:{display:false}, ticks:{font:{family:'Inter',size:10}} },
+        y: { ticks:{font:{family:'Inter',size:10}, callback: yLabel}, grid:{color:'#E8EDF8'} }
       }
     }
   });
