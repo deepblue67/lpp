@@ -264,6 +264,7 @@
           <tr>
             <th onclick="sortBy('prospect')">Prospect <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('source')">Source <span class="sort-icon">↕</span></th>
+            <th onclick="sortBy('dateContact')">Date contact <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('apport')">Apport <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('ville')">Ville <span class="sort-icon">↕</span></th>
             <th onclick="sortBy('dateRappel')">Date rappel <span class="sort-icon">↕</span></th>
@@ -712,6 +713,7 @@ function renderTable() {
     return `<tr${rowCls}>
       <td class="prospect-name"><button class="link-btn" data-idx="${realIdx}" onclick="openFiche(this.dataset.idx)">${esc(p.prospect)}</button></td>
       <td>${badge}</td>
+      <td>${esc(p.dateContact)}</td>
       <td>${esc(p.apport)}</td>
       <td>${esc(String(p.ville||""))}</td>
       <td>${rappel}</td>
