@@ -452,7 +452,7 @@ function buildCharts() {
     const s = p.source || "Autre";
     srcCount[s] = (srcCount[s] || 0) + 1;
     noteCount[p.noteActuelle] = (noteCount[p.noteActuelle] || 0) + 1;
-    const v = (p.ville || "").trim();
+    const v = String(p.ville || "").trim();
     if (v) villeCount[v] = (villeCount[v] || 0) + 1;
   });
 
@@ -497,7 +497,7 @@ function buildCharts() {
 // ── Filters ───────────────────────────────────────────────────────────────
 function populateFilters() {
   const sources = [...new Set(allData.map(p => p.source).filter(Boolean))].sort();
-  const villes  = [...new Set(allData.map(p => (p.ville||"").trim()).filter(Boolean))].sort();
+  const villes  = [...new Set(allData.map(p => String(p.ville||"").trim()).filter(Boolean))].sort();
   const fSrc = document.getElementById("filterSource");
   const fVil = document.getElementById("filterVille");
   sources.forEach(s => { const o = document.createElement("option"); o.value = s; o.textContent = s; fSrc.appendChild(o); });
@@ -517,7 +517,7 @@ function applyFilters() {
     if (q && !`${p.prospect} ${p.ville} ${p.email} ${p.source} ${p.apport}`.toLowerCase().includes(q)) return false;
     if (src  && p.source !== src) return false;
     if (note && String(p.noteActuelle) !== note) return false;
-    if (vil  && (p.ville||"").trim() !== vil) return false;
+    if (vil  && String(p.ville||"").trim() !== vil) return false;
     if (rap === "late") {
       const d = parseDate(p.dateRappel);
       if (!d || d >= today) return false;
