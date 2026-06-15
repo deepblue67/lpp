@@ -276,14 +276,6 @@ function buildBlock(site, last, slots, currRow) {
     : (ecart >= 0 ? '▲ +' : '▼ ') + fmt0(Math.abs(ecart)) + ' €'
     + (objectif > 0 ? ' (' + (ecart>=0?'+':'') + ((ecart/objectif)*100).toFixed(1) + '%)' : '');
 
-  // Projection : CA/j nécessaire pour atteindre l'objectif fin de mois
-  const totalJoursPrevus = (curr && calendrier[curr.moisKey] && calendrier[curr.moisKey][String(curr.calYear)])
-    ? Number(calendrier[curr.moisKey][String(curr.calYear)]) : null;
-  const joursRestants    = (totalJoursPrevus !== null && curr) ? totalJoursPrevus - curr.nb_jours : null;
-  const objectifFinMois  = (moyN1 !== null && totalJoursPrevus !== null) ? moyN1 * totalJoursPrevus : null;
-  const caManquant       = (objectifFinMois !== null && currCA !== null) ? objectifFinMois - currCA : null;
-  const caJourNecessaire = (caManquant !== null && joursRestants > 0) ? caManquant / joursRestants : null;
-
   // Label du mois en cours depuis la date système
   const now = new Date();
   const mNamesLong = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
@@ -291,6 +283,14 @@ function buildBlock(site, last, slots, currRow) {
   const currMoisLabel = curr ? curr.mois : todayLabel + ' (aucune donnée)';
   const currJours     = curr ? curr.nb_jours : 0;
   const currCA        = curr ? curr[site] : null;
+
+  // Projection : CA/j nécessaire pour atteindre l'objectif fin de mois
+  const totalJoursPrevus = (curr && calendrier[curr.moisKey] && calendrier[curr.moisKey][String(curr.calYear)])
+    ? Number(calendrier[curr.moisKey][String(curr.calYear)]) : null;
+  const joursRestants    = (totalJoursPrevus !== null && curr) ? totalJoursPrevus - curr.nb_jours : null;
+  const objectifFinMois  = (moyN1 !== null && totalJoursPrevus !== null) ? moyN1 * totalJoursPrevus : null;
+  const caManquant       = (objectifFinMois !== null && currCA !== null) ? objectifFinMois - currCA : null;
+  const caJourNecessaire = (caManquant !== null && joursRestants > 0) ? caManquant / joursRestants : null;
 
   return `
   <div class="site-block">
