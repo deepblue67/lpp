@@ -70,6 +70,11 @@
     .ecart-pos .metric-label,.ecart-pos .metric-value{color:#155724;}
     .ecart-neg{background:#F8D7DA;}
     .ecart-neg .metric-label,.ecart-neg .metric-value{color:#721C24;}
+    .projection-block{width:100%;background:var(--navy);border-radius:10px;padding:12px 14px;text-align:center;margin-top:2px;}
+    .proj-label{font-size:9px;font-weight:700;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:flex;align-items:center;justify-content:center;gap:4px;}
+    .proj-value{font-size:20px;font-weight:800;color:#fff;line-height:1.1;}
+    .proj-sub{font-size:9px;color:rgba(255,255,255,.5);margin-top:5px;line-height:1.4;}
+    .proj-missing{font-size:10px;color:rgba(255,255,255,.45);font-style:italic;padding:4px 0;}
     .toggle-btn{border:1.5px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;background:#fff;color:var(--text-light);transition:all .15s;white-space:nowrap;}
     .toggle-btn.active{background:var(--indigo-mid);color:#fff;border-color:var(--indigo-mid);}
     .toggle-btn:hover:not(.active){background:var(--indigo-pale);border-color:var(--indigo-mid);}
@@ -138,6 +143,7 @@ const SITE_COLORS = {Lingo:'#3B5998',Stras:'#E84393',Eckbo:'#FF8C00',Schilic:'#2
 const MOIS_NUM = {octobre:10,novembre:11,décembre:12,janvier:1,février:2,mars:3,avril:4,mai:5,juin:6,juillet:7,août:8,septembre:9};
 
 let rawData = [];
+let calendrier = {};
 let CHARTS = {};
 let chartSlots = []; // slots courants, mémorisés pour re-render ciblé
 let chartLast  = []; // last courant
@@ -184,6 +190,7 @@ async function loadData() {
     const j = await r.json();
     if (j.status !== 'ok') throw new Error(j.error || 'Erreur Apps Script');
     rawData = enrich(j.data);
+    calendrier = j.calendrier || {};
     document.getElementById('last-update').textContent = 'Mis à jour ' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
     applyFilters();
   } catch(e) {
@@ -269,6 +276,14 @@ function buildBlock(site, last, slots, currRow) {
     : (ecart >= 0 ? '▲ +' : '▼ ') + fmt0(Math.abs(ecart)) + ' €'
     + (objectif > 0 ? ' (' + (ecart>=0?'+':'') + ((ecart/objectif)*100).toFixed(1) + '%)' : '');
 
+  // Projection : CA/j nécessaire pour atteindre l'objectif fin de mois
+  const totalJoursPrevus = (curr && calendrier[curr.moisKey] && calendrier[curr.moisKey][String(curr.calYear)])
+    ? Number(calendrier[curr.moisKey][String(curr.calYear)]) : null;
+  const joursRestants    = (totalJoursPrevus !== null && curr) ? totalJoursPrevus - curr.nb_jours : null;
+  const objectifFinMois  = (moyN1 !== null && totalJoursPrevus !== null) ? moyN1 * totalJoursPrevus : null;
+  const caManquant       = (objectifFinMois !== null && currCA !== null) ? objectifFinMois - currCA : null;
+  const caJourNecessaire = (caManquant !== null && joursRestants > 0) ? caManquant / joursRestants : null;
+
   // Label du mois en cours depuis la date système
   const now = new Date();
   const mNamesLong = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
@@ -317,6 +332,20 @@ function buildBlock(site, last, slots, currRow) {
             <div class="metric-label">Écart vs objectif <span class="tip-wrap"><i class="tip-icon">i</i><span class="tip-box">CA réel N − Objectif N = différence entre réalisé et objectif (en € et en %)</span></span></div>
             <div class="metric-value">${ecartStr}</div>
           </div>
+        </div>
+        <div class="projection-block">
+          <div class="proj-label">CA/j à réaliser
+            <span class="tip-wrap"><i class="tip-icon" style="background:rgba(255,255,255,.35);color:#fff">i</i><span class="tip-box">(Objectif fin de mois − CA réel N) ÷ jours restants à travailler. Objectif fin de mois = Moy/j N-1 × total jours prévus (onglet Calendrier).</span></span>
+          </div>
+          ${caJourNecessaire !== null
+            ? `<div class="proj-value">${fmtE(caJourNecessaire)}</div>
+               <div class="proj-sub">${joursRestants} jour${joursRestants>1?'s':''} restant${joursRestants>1?'s':''} · objectif fin de mois : ${fmtE(objectifFinMois)}</div>`
+            : totalJoursPrevus === null
+              ? `<div class="proj-missing">Renseigner l'onglet Calendrier<br>pour ce mois</div>`
+              : joursRestants <= 0
+                ? `<div class="proj-missing">Mois terminé</div>`
+                : `<div class="proj-missing">Données insuffisantes</div>`
+          }
         </div>
       </div>
       <div class="chart-panel">
