@@ -58,7 +58,7 @@
   .block-tag{font-size:9.5px;font-weight:800;letter-spacing:.6px;background:var(--indigo-pale);color:var(--navy);border-radius:5px;padding:3px 7px;text-transform:uppercase;}
   .block-sub{font-size:11px;color:var(--text-light);font-weight:400;margin-top:2px;}
   .block-body{padding:18px 22px 20px;}
-  .block.hidden{display:none;}
+  .block.hidden,.hidden{display:none;}
 
   /* KPI */
   .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
@@ -68,6 +68,22 @@
   .kpi-label{font-size:9.5px;font-weight:800;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:4px;}
   .kpi-value{font-size:22px;font-weight:800;margin-top:5px;line-height:1.1;}
   .kpi-sub{font-size:10.5px;color:var(--text-light);margin-top:4px;line-height:1.35;}
+
+  /* Blocs par magasin (même structure que dashboard_moy_jour.html) */
+  .site-head{padding:13px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+  .site-name{font-size:16.5px;font-weight:800;display:flex;align-items:center;gap:10px;}
+  .site-meta{font-size:12px;color:var(--text-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .days-badge{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;color:#fff;}
+  .site-body{display:grid;grid-template-columns:272px 1fr;gap:0;}
+  .gauge-panel{padding:16px 18px 16px;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .gauge-title{font-size:11px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;text-align:center;}
+  .chart-panel{padding:16px 20px 16px;}
+  .toggle-btn{border:1.5px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;background:#fff;color:var(--text-light);transition:all .15s;white-space:nowrap;font-family:inherit;}
+  .toggle-btn.active{background:var(--indigo-mid);color:#fff;border-color:var(--indigo-mid);}
+  .toggle-btn:hover:not(.active){background:var(--indigo-pale);border-color:var(--indigo-mid);}
+  .mag-sep{display:flex;align-items:center;gap:12px;margin:2px 0 18px;}
+  .mag-sep span{font-size:11px;font-weight:800;color:var(--text-light);text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;}
+  .mag-sep i{flex:1;height:1px;background:var(--border);}
 
   /* Gauges */
   .gauge-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px;}
@@ -150,6 +166,7 @@
   footer{text-align:center;padding:22px;font-size:11.5px;color:var(--text-light);border-top:1px solid var(--border);margin-top:8px;line-height:1.6;}
 
   @media(max-width:1100px){.grid2{grid-template-columns:1fr;}header{flex-wrap:wrap;gap:10px;padding:12px 18px;}.header-center{order:3;width:100%;text-align:left;}.filters-bar{position:static;}}
+  @media(max-width:1000px){.site-body{grid-template-columns:1fr;}.gauge-panel{border-right:none;border-bottom:1px solid var(--border);}}
   @media(max-width:700px){main{padding:16px;}.filters-bar,.blocks-bar{padding:10px 16px;}.cal-grid{gap:4px;}.cal-cell{min-height:62px;padding:5px;}.cal-cell .cv{font-size:12px;}}
   @media print{
     header,.filters-bar,.blocks-bar,.btn-refresh{display:none!important;}
@@ -237,7 +254,11 @@ const COL = {
   cuisineTotal:18,                // S  ← Traiteur cuisine
   magasinSites:[19,20,21,22,23],  // T U V W X
   magasinTotal:24,                // Y  ← Traiteur magasins
-  grandTotal:37                   // AL ← TOTAL GÉNÉRAL (sert à détecter un jour saisi)
+  grandTotal:37,                  // AL ← TOTAL GÉNÉRAL (sert à détecter un jour saisi)
+  // 1re colonne magasin de chacune des 6 catégories de CA (midi, livraison,
+  // traiteur cuisine, traiteur magasin, traiteur AZ, commande AZ) : la somme
+  // donne le CA TTC du jour POUR UN magasin → sert à compter ses jours travaillés.
+  catStarts:[1,7,13,19,25,31]
 };
 
 const SITES       = ['Lingo','Stras','Eckbo','Schilic','Illkirch'];
@@ -253,6 +274,7 @@ const DOW       = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
 const DOW_LONG  = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 
 const BLOCKS = [
+  {id:'bmag', label:'★ · Blocs par magasin',     def:true},
   {id:'b0', label:'A · Synthèse du mois',        def:true},
   {id:'b1', label:'B · Jauges & objectifs',      def:true},
   {id:'b2', label:'C · Calendrier du mois',      def:true},
@@ -274,6 +296,9 @@ let CALENDRIER = {};  // {novembre:{'2026':20}}
 let CHARTS = {};
 let SCOPE = 'total';
 let SOURCE = '';
+let CUR_KEY = null, CUR_HIST = 12;
+const siteChartType   = {Lingo:'bar',Stras:'bar',Eckbo:'bar',Schilic:'bar',Illkirch:'bar'};
+const siteChartMetric = {Lingo:'ca', Stras:'ca', Eckbo:'ca', Schilic:'ca', Illkirch:'ca'};
 const TODAY = new Date(); TODAY.setHours(0,0,0,0);
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -327,7 +352,8 @@ async function loadData(){
         rows = j.data.map(o=>({
           y:+o.y, m:+o.m, d:+o.d,
           cuisine:nz(+o.cuisine), magasin:nz(+o.magasin), grand:nz(+o.grand),
-          cSites:(o.cuisineSites||[]).map(nz), mSites:(o.magasinSites||[]).map(nz)
+          cSites:(o.cuisineSites||[]).map(nz), mSites:(o.magasinSites||[]).map(nz),
+          sDay:(o.siteTotals||[]).map(nz)
         }));
         SOURCE = 'Apps Script (type=traiteur)';
       }
@@ -398,7 +424,9 @@ function parseVentilationCSV(text){
       magasin:parseNum(get(r,COL.magasinTotal)),
       grand:parseNum(get(r,COL.grandTotal)),
       cSites:COL.cuisineSites.map(i=>parseNum(get(r,i))),
-      mSites:COL.magasinSites.map(i=>parseNum(get(r,i)))
+      mSites:COL.magasinSites.map(i=>parseNum(get(r,i))),
+      // CA TTC du jour par magasin = somme des 6 catégories pour ce magasin
+      sDay:[0,1,2,3,4].map(i=>COL.catStarts.reduce((a,c)=>a+parseNum(get(r,c+i)),0))
     });
   }
   return res;
@@ -412,7 +440,7 @@ function buildIndex(rows){
       y:r.y, m:r.m, d:r.d, dt,
       dow:(dt.getDay()+6)%7,                       // 0 = lundi
       cuisine:nz(r.cuisine), magasin:nz(r.magasin), grand:nz(r.grand),
-      cSites:r.cSites||[], mSites:r.mSites||[],
+      cSites:r.cSites||[], mSites:r.mSites||[], sDay:r.sDay||[],
       future: dt > TODAY
     };
     o.total = o.cuisine + o.magasin;
@@ -447,6 +475,27 @@ function statsOf(key){
   s.nbJoursTraiteur = saisis.filter(d=>d.total>0).length;
   return s;
 }
+/** Mêmes statistiques, restreintes à UN magasin (index 0→4).
+ *  Les « jours travaillés » sont ceux du magasin lui-même (CA TTC du jour > 0),
+ *  pas ceux de l'ensemble du réseau. */
+function statsOfSite(key, idx){
+  const days = BYMONTH[key] || [];
+  const saisis = days.filter(d => (d.sDay && d.sDay.length===5) ? d.sDay[idx] > 0 : d.saisi);
+  const s = {
+    key, exists: !!BYMONTH[key], label: monthLabel(key),
+    days, saisis, nbJours: saisis.length,
+    cuisine: saisis.reduce((a,d)=>a+nz(d.cSites[idx]),0),
+    magasin: saisis.reduce((a,d)=>a+nz(d.mSites[idx]),0),
+    grand:   saisis.reduce((a,d)=>a+((d.sDay&&d.sDay.length===5)?nz(d.sDay[idx]):0),0)
+  };
+  s.total = s.cuisine + s.magasin;
+  s.moyCuisine = s.nbJours ? s.cuisine/s.nbJours : null;
+  s.moyMagasin = s.nbJours ? s.magasin/s.nbJours : null;
+  s.moyTotal   = s.nbJours ? s.total  /s.nbJours : null;
+  s.nbJoursTraiteur = saisis.filter(d=>nz(d.cSites[idx])+nz(d.mSites[idx])>0).length;
+  return s;
+}
+
 function prevYearKey(key){ const [y,m]=key.split('-'); return monthKey(+y-1,+m); }
 function joursPrevus(key){
   const [y,m]=key.split('-');
@@ -515,11 +564,13 @@ function render(){
   const N  = statsOf(key);
   const N1 = statsOf(prevYearKey(key));
   const nbHist = +document.getElementById('f-hist').value;
+  CUR_KEY = key; CUR_HIST = nbHist;
 
   let html = '';
   if(!N1.exists || !N1.nbJours){
     html += `<div class="note"><b>Pas de référence N-1 pour ${esc(N.label)}.</b> L'onglet « Ventilation CA TTC » démarre en octobre 2025 : les objectifs et comparatifs N-1 n'apparaissent qu'à partir d'octobre 2026. Les blocs de suivi du mois restent lisibles, les colonnes N-1 affichent « — ».</div>`;
   }
+  html += blockMagasins(key);
   html += blockSynthese(N,N1);
   html += blockJauges(N,N1);
   html += blockCalendrier(N,N1);
@@ -533,11 +584,218 @@ function render(){
   document.getElementById('content').innerHTML = html;
   applyBlockVisibility();
 
+  SITES.forEach((s,i)=>drawSiteChart(s,i,key,nbHist));
   drawCumul(N,N1);
   drawBarres(N,N1);
   drawDow(N,N1);
   drawHistorique(key,nbHist);
   drawSites(N);
+}
+
+/* ═══════════════ ★ · BLOCS PAR MAGASIN (en tête de page) ═══════════════════
+   Même structure que dashboard_moy_jour.html : jauge + métriques à gauche,
+   historique mensuel N vs N-1 à droite. Appliqué à l'activité traiteur
+   (sélecteur « Activité » : Total traiteur / Cuisine / Magasins).
+   ═══════════════════════════════════════════════════════════════════════════ */
+function blockMagasins(key){
+  const moisCourt = monthLabel(key).split(' ')[0];
+  let html = `<div id="bmag">
+    <div class="mag-sep"><span>Par magasin — ${esc(scopeLabel(SCOPE))}</span><i></i></div>`;
+  SITES.forEach((site,i)=>{ html += siteBlock(site,i,key,moisCourt); });
+  html += `</div>`;
+  return html;
+}
+
+function siteBlock(site,idx,key,moisCourt){
+  const color = SITE_COLORS[site];
+  const N  = statsOfSite(key, idx);
+  const N1 = statsOfSite(prevYearKey(key), idx);
+
+  const real  = pick(N, SCOPE);
+  const moyN1 = N1.nbJours ? pickMoy(N1, SCOPE) : null;
+  const moyN  = N.nbJours ? real/N.nbJours : null;
+  const obj   = moyN1!==null ? moyN1*N.nbJours : null;
+  const pct   = (obj && obj>0) ? real/obj*100 : null;
+  const ecart = obj!==null ? real-obj : null;
+  const ecartCls = (ecart===null||!obj) ? '' : (ecart>=0?'ecart-pos':'ecart-neg');
+  const ecartStr = ecart===null ? '—'
+    : (ecart>=0?'▲ +':'▼ ') + fmt0(Math.abs(ecart)) + ' €'
+      + (obj>0 ? ' ('+(ecart>=0?'+':'')+((ecart/obj)*100).toFixed(1).replace('.',',')+' %)' : '');
+
+  const jp        = joursPrevus(key);
+  const restants  = jp!==null ? jp-N.nbJours : null;
+  const objFin    = (moyN1!==null && jp!==null) ? moyN1*jp : null;
+  const manquant  = objFin!==null ? objFin-real : null;
+  const caJour    = (manquant!==null && restants!==null && restants>0) ? manquant/restants : null;
+
+  let proj;
+  if(caJour!==null)        proj = `<div class="proj-value">${fmtE(caJour)}</div>
+                                   <div class="proj-sub">${restants} jour${restants>1?'s':''} restant${restants>1?'s':''} · objectif fin de mois : ${fmtE(objFin)}</div>`;
+  else if(jp===null)       proj = `<div class="proj-missing">Renseigner l'onglet Calendrier<br/>pour ce mois</div>`;
+  else if(moyN1===null)    proj = `<div class="proj-missing">Pas de référence N-1</div>`;
+  else if(restants<=0)     proj = `<div class="proj-value" style="font-size:16px">Mois terminé</div>
+                                   <div class="proj-sub">Objectif fin de mois : ${fmtE(objFin)}</div>`;
+  else                     proj = `<div class="proj-missing">Données insuffisantes</div>`;
+
+  return `
+  <div class="block">
+    <div class="site-head">
+      <div class="site-name"><span class="dot" style="background:${color}"></span>${esc(SITE_NAMES[site])}</div>
+      <div class="site-meta">
+        <span>Mois : <strong>${esc(monthLabel(key))}</strong></span>
+        <span class="days-badge" style="background:${color}">📅 ${N.nbJours} jour${N.nbJours>1?'s':''} travaillé${N.nbJours>1?'s':''} (N)</span>
+        ${N1.nbJours
+          ? `<span style="background:${color}33;color:${color};padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">${N1.nbJours}j N-1</span>`
+          : `<span style="color:#B4BFD4;font-size:11px">N-1 non disponible</span>`}
+      </div>
+    </div>
+    <div class="site-body">
+      <div class="gauge-panel">
+        <div class="gauge-title">Avancement ${esc(moisCourt)}</div>
+        ${makeGaugeSVG(pct)}
+        <div class="metric-grid">
+          <div class="metric-item"><div class="metric-label">Moy/j N-1 ${tip('CA traiteur du magasin sur le même mois N-1 ÷ ses jours travaillés N-1')}</div><div class="metric-value">${fmtE(moyN1)}</div></div>
+          <div class="metric-item"><div class="metric-label">Moy/j N ${tip('CA traiteur du magasin sur le mois ÷ ses jours travaillés N')}</div><div class="metric-value">${fmtE(moyN)}</div></div>
+          <div class="metric-item" style="background:${color}18;border:1.5px solid ${color}44">
+            <div class="metric-label" style="color:${color}">Objectif N ${tip('Moy/j N-1 × nb jours travaillés N — objectif glissant, identique aux dashboards magasins')}</div>
+            <div class="metric-value" style="color:${color}">${fmtE(obj)}</div></div>
+          <div class="metric-item"><div class="metric-label">CA réel N ${tip('CA traiteur TTC réalisé par ce magasin sur le mois')}</div><div class="metric-value">${fmtE(real)}</div></div>
+          <div class="metric-item full ${ecartCls}">
+            <div class="metric-label">Écart vs objectif ${tip('CA réel N − Objectif N, en € et en %')}</div>
+            <div class="metric-value">${ecartStr}</div></div>
+        </div>
+        <div class="projection-block">
+          <div class="proj-label">CA/j à réaliser ${tip('(Objectif fin de mois − CA réel N) ÷ jours restants. Objectif fin de mois = Moy/j N-1 × jours prévus (onglet Calendrier).')}</div>
+          ${proj}
+        </div>
+      </div>
+      <div class="chart-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <div style="font-size:11px;color:var(--text-light)">Survoler pour détail jours + moy/jour</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <div style="display:flex;gap:3px;">
+              <button id="bt-type-bar-${site}"  class="toggle-btn${siteChartType[site]==='bar'?' active':''}"  onclick="setSiteType('${site}','bar')">&#9646; Barres</button>
+              <button id="bt-type-line-${site}" class="toggle-btn${siteChartType[site]==='line'?' active':''}" onclick="setSiteType('${site}','line')">&#8725; Courbes</button>
+            </div>
+            <div style="width:1px;height:22px;background:var(--border)"></div>
+            <div style="display:flex;gap:3px;">
+              <button id="bt-met-ca-${site}"  class="toggle-btn${siteChartMetric[site]==='ca'?' active':''}"  onclick="setSiteMetric('${site}','ca')">CA total</button>
+              <button id="bt-met-moy-${site}" class="toggle-btn${siteChartMetric[site]==='moy'?' active':''}" onclick="setSiteMetric('${site}','moy')">Moy/jour</button>
+            </div>
+          </div>
+        </div>
+        <div style="position:relative;height:250px"><canvas id="mchart-${site}"></canvas></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function setSiteType(site,t){
+  siteChartType[site]=t;
+  ['bar','line'].forEach(x=>{const b=document.getElementById('bt-type-'+x+'-'+site); if(b) b.classList.toggle('active',x===t);});
+  const i=SITES.indexOf(site);
+  if(CHARTS['m'+site]){ try{CHARTS['m'+site].destroy();}catch(e){} delete CHARTS['m'+site]; }
+  drawSiteChart(site,i,CUR_KEY,CUR_HIST);
+}
+function setSiteMetric(site,m){
+  siteChartMetric[site]=m;
+  ['ca','moy'].forEach(x=>{const b=document.getElementById('bt-met-'+x+'-'+site); if(b) b.classList.toggle('active',x===m);});
+  const i=SITES.indexOf(site);
+  if(CHARTS['m'+site]){ try{CHARTS['m'+site].destroy();}catch(e){} delete CHARTS['m'+site]; }
+  drawSiteChart(site,i,CUR_KEY,CUR_HIST);
+}
+
+function drawSiteChart(site,idx,key,nb){
+  const el=document.getElementById('mchart-'+site); if(!el) return;
+  const color=SITE_COLORS[site];
+  const isLine = siteChartType[site]==='line';
+  const isMoy  = siteChartMetric[site]==='moy';
+
+  const iCur = MONTHS.indexOf(key);
+  const upTo = iCur<0 ? MONTHS.length-1 : iCur;
+  const start = nb>=99 ? 0 : Math.max(0, upTo-nb+1);
+  const keys = MONTHS.slice(start, upTo+1);
+
+  const labels=[], dN=[], dN1=[], metaN=[], metaN1=[];
+  const mShort=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  keys.forEach(k=>{
+    const [yy,mm]=k.split('-');
+    labels.push(mShort[+mm-1]+" '"+yy.slice(2));
+    const a=statsOfSite(k,idx), b=statsOfSite(prevYearKey(k),idx);
+    metaN.push(a); metaN1.push(b);
+    dN.push(  a.nbJours ? Math.round(isMoy ? pick(a,SCOPE)/a.nbJours : pick(a,SCOPE)) : null);
+    dN1.push( b.nbJours ? Math.round(isMoy ? pick(b,SCOPE)/b.nbJours : pick(b,SCOPE)) : null);
+  });
+
+  const labelN1 = isMoy ? 'N-1 moy/jour (réf.)' : 'N-1 CA total (réf.)';
+  const labelN  = isMoy ? 'N moy/jour (réel)'   : 'N CA total (réel)';
+  const base = {spanGaps:true, borderRadius:isLine?0:4, borderSkipped:false};
+
+  const ds1 = isLine
+    ? {...base, label:labelN1, data:dN1, borderColor:color+'88', backgroundColor:color+'18', borderWidth:2, borderDash:[5,4], fill:false, tension:.35, pointRadius:3, pointBorderColor:color+'88', pointBackgroundColor:'#fff'}
+    : {...base, label:labelN1, data:dN1, backgroundColor:color+'44', borderColor:color+'70', borderWidth:1};
+  const ds2 = isLine
+    ? {...base, label:labelN,  data:dN,  borderColor:color, backgroundColor:color+'22', borderWidth:2.5, fill:false, tension:.35, pointRadius:4, pointBackgroundColor:color}
+    : {...base, label:labelN,  data:dN,  backgroundColor:color+'CC', borderColor:color, borderWidth:1.5};
+
+  const pctPlugin = {
+    id:'pctLabels-'+site,
+    afterDatasetsDraw(chart){
+      const {ctx, scales:{y}} = chart;
+      const ds = chart.data.datasets[1];
+      ctx.save();
+      ctx.font='700 10px Inter, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ds.data.forEach((vN,i)=>{
+        const vN1 = chart.data.datasets[0].data[i];
+        if(vN===null||vN1===null||vN1===0) return;
+        const p = (vN-vN1)/vN1*100;
+        const label = (p>=0?'+':'')+p.toFixed(1)+'%';
+        const bg = p>=2 ? '#28A745' : p<=-2 ? '#E05A4A' : '#E8A020';
+        const meta = chart.getDatasetMeta(1), elm = meta.data[i];
+        if(!elm) return;
+        const px = elm.x;
+        const py = isLine ? elm.y-6 : y.getPixelForValue(Math.max(vN,vN1))-6;
+        const tw = ctx.measureText(label).width+8, th=14;
+        ctx.fillStyle=bg; ctx.beginPath();
+        if(ctx.roundRect) ctx.roundRect(px-tw/2, py-th, tw, th, 3); else ctx.rect(px-tw/2, py-th, tw, th);
+        ctx.fill();
+        ctx.fillStyle='#fff'; ctx.fillText(label, px, py-1);
+      });
+      ctx.restore();
+    }
+  };
+
+  CHARTS['m'+site] = new Chart(el,{
+    type: isLine?'line':'bar',
+    data:{labels, datasets:[ds1, ds2]},
+    plugins:[pctPlugin],
+    options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{position:'top', labels:{font:{family:'Inter',size:11}, padding:12, boxWidth:14, useBorderRadius:true, borderRadius:3}},
+        tooltip:{callbacks:{label(c){
+          const isN = c.datasetIndex===1;
+          const row = isN ? metaN[c.dataIndex] : metaN1[c.dataIndex];
+          if(!row || !row.nbJours || c.raw===null) return ` ${c.dataset.label} : N/A`;
+          const ca = pick(row,SCOPE), j = row.nbJours;
+          const lines = [
+            ` ${c.dataset.label} : ${fmt0(c.raw)} €${isMoy?'/j':''}`,
+            ` CA traiteur : ${fmt0(ca)} €`,
+            ` Jours travaillés : ${j}`,
+            ` Moy/jour : ${fmt0(ca/j)} €/j`
+          ];
+          if(isN){
+            const p = metaN1[c.dataIndex];
+            if(p && p.nbJours){
+              const o = Math.round(pick(p,SCOPE)/p.nbJours*j), diff = ca-o;
+              lines.push(` Objectif : ${fmt0(o)} € | Écart : ${diff>=0?'+':''}${fmt0(diff)} €`);
+            }
+          }
+          return lines;
+        }}}
+      },
+      scales:{x:{grid:{display:false}, ticks:{font:{family:'Inter',size:10}}},
+              y:{beginAtZero:true, ticks:{font:{family:'Inter',size:10}, callback:v=>isMoy?fmt0(v)+' €/j':fmtK(v)}, grid:{color:'#E8EDF8'}}}}
+  });
 }
 
 /* ─────────────────────────────── A · Synthèse ──────────────────────────── */
