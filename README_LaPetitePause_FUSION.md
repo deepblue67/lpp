@@ -696,7 +696,7 @@ Les données allergènes dans le XLS original étaient encodées par **couleur d
 
 ### Vue d'ensemble
 
-Projet de **tableaux de bord pour 5 magasins La Petite Pause**, permettant le suivi du chiffre d'affaires en temps réel depuis n'importe quel navigateur. Les données viennent d'un **Google Sheet central**, exposées par un **Apps Script** en JSON, et consommées par **3 dashboards HTML statiques** hébergés sur GitHub Pages.
+Projet de **tableaux de bord pour 5 magasins La Petite Pause**, permettant le suivi du chiffre d'affaires en temps réel depuis n'importe quel navigateur. Les données viennent d'un **Google Sheet central**, exposées par un **Apps Script** en JSON, et consommées par **4 dashboards HTML statiques** hébergés sur GitHub Pages.
 
 **Magasins suivis :**
 
@@ -732,43 +732,55 @@ Cinq onglets identiques en structure, un par magasin. Contiennent les **données
 
 **Mapping des 26 colonnes (B à AA) :**
 
-| Col GS | Contenu |
-|--------|---------|
-| B | Jour (numéro) |
-| C | CAISSE (total encaissé) |
-| D | TVA 20% |
-| E | TVA 5,5% |
-| F | TVA 10% |
-| G | **CA HT** ← valeur principale utilisée dans les dashboards |
-| H | Virement |
-| I | Espèces |
-| J | Ticket Restaurant |
-| K | Chèque |
-| L | CB |
-| M | TR2 |
-| N | CB2 |
-| O | Carte TR |
-| P | Deliveroo |
-| Q | **VIDE** ← colonne vide dans GS, n'existe pas dans le fichier xlsb source |
-| R | Caisse |
-| S | De côté |
-| T | Fond de caisse 1 |
-| U | Fond de caisse 2 |
-| V | BQ Espèces |
-| W | BQ Chèques |
-| X | CONNECT |
-| Y | **VIDE** ← colonne vide dans GS, n'existe pas dans le fichier xlsb source |
-| Z | Libellé |
-| AA | Montant |
-| AB | Date référence |
+| Col GS | Contenu | Type | Protégée |
+|--------|---------|------|----------|
+| B | Jour (numéro) | Saisie | |
+| C | CAISSE TTC (total encaissé) | **Saisie** ← valeur brute de caisse, ne pas mettre de formule | |
+| D | TVA 20% | Saisie | |
+| E | TVA 5,5% | Saisie | |
+| F | TVA 10% | Saisie | 🔒 |
+| G | **CA HT** ← valeur principale utilisée dans les dashboards | Saisie | |
+| H | Virement | Saisie | |
+| I | **ESPECES** | Formule `=C-J-K-L-H-M-P-N-O` | 🔒 |
+| J | Ticket Restaurant | Saisie | |
+| K | Chèque | Saisie | |
+| L | CB | Saisie | |
+| M | TR2 | Saisie | |
+| N | CB2 | Saisie | |
+| O | Carte TR | Saisie | |
+| P | Deliveroo | Saisie | |
+| Q | **VIDE** ← colonne vide dans GS, n'existe pas dans le fichier xlsb source | | |
+| R | Caisse | Saisie | |
+| S | **FOND DE CAISSE** | Formule `=I-Q-R` | 🔒 |
+| T | Fond de caisse cumulé | Saisie | 🔒 |
+| U | Fond de caisse 2 | Saisie | |
+| V | BQ Espèces | Saisie | |
+| W | BQ Chèques | Saisie | |
+| X | CONNECT | Saisie | |
+| Y | **VIDE** ← colonne vide dans GS, n'existe pas dans le fichier xlsb source | | |
+| Z | Libellé | Saisie | |
+| AA | Montant | Saisie | |
+| AB | Date référence | Saisie | |
 
 > ⚠️ **Point critique pour la maintenance :** Les colonnes Q et Y du Google Sheet sont vides et n'ont pas d'équivalent dans le fichier Excel source (`.xlsb`). Tout script d'import doit gérer ce décalage (voir section 5 — Workflow mensuel).
+
+> ⚠️ **Colonne C (CAISSE TTC) = saisie obligatoire.** Ne jamais y mettre une formule comme `=H+I+J+...` — cela crée une dépendance circulaire avec la colonne I (ESPECES) qui est calculée à partir de C. La colonne C est la valeur brute lue sur la caisse.
+
+> 🔒 **Colonnes protégées (mode strict)** sur les 5 onglets magasins : **F, I, S, T**. Seul le propriétaire du GSheet peut les modifier. Les formules des colonnes I et S ont été ajoutées via `fixColonnesICS.gs`.
+
+---
+
+##### Onglet `SYNTHESE CA HT`
+
+> 🔒 **Onglet entièrement protégé (mode strict).** Seul le propriétaire peut modifier. Protégé via `protectFormules.gs`.
 
 ---
 
 ##### Onglet `HISTORIQUE CA HT`
 
-**Rôle :** Agrégat mensuel par magasin. C'est **l'onglet source des 3 dashboards**. Il est lu à chaque chargement d'un dashboard via l'Apps Script.
+> 🔒 **Onglet entièrement protégé (mode strict).** Seul le propriétaire peut modifier. Protégé via `protectFormules.gs`.
+
+**Rôle :** Agrégat mensuel par magasin. C'est **l'onglet source de `dashboard_ht.html` et `dashboard_moy_jour.html`**. Il est lu à chaque chargement de ces dashboards via l'Apps Script. (`dashboard_ttc.html` et `dashboard_traiteur.html` lisent l'onglet `Ventilation CA TTC`.)
 
 **Structure :**
 - Organisé par **année fiscale** (octobre → septembre), chaque année précédée d'une ligne `Année XXXX-XXXX`
@@ -812,8 +824,32 @@ Cinq onglets identiques en structure, un par magasin. Contiennent les **données
 | Commande AZ | `commande_az` | `#FF6666` rouge |
 | Offerts | `offerts` | `#A6A6A6` gris |
 
-**Ordre des colonnes dans le Google Sheet (par catégorie) :**
-Pour chaque catégorie : 5 colonnes magasins (Lingo, Stras, Eckbo, Schilic, Illkirch) + 1 colonne total = 6 colonnes. Puis en fin de ligne : grand total (col 43).
+**Ordre des colonnes dans le Google Sheet :**
+
+| Colonnes | Contenu | Protégée |
+|----------|---------|----------|
+| B–F | Total midi (Lingo, Stras, Eckbo, Schilic, Illkirch) | |
+| G | Total midi | 🔒 Formule |
+| H–L | Livraison (Lingo, Stras, Eckbo, Schilic, Illkirch) | |
+| M | Total livraison | 🔒 Formule |
+| N–R | Traiteur cuisine (Lingo, Stras, Eckbo, Schilic, Illkirch) | |
+| S | Total traiteur cuisine | 🔒 Formule |
+| T–X | Traiteur magasin (Lingo, Stras, Eckbo, Schilic, Illkirch) | |
+| Y | Total traiteur magasin | 🔒 Formule |
+| Z–AD | Traiteur AZ (Lingo, Stras, Eckbo, Schilic, Illkirch) | |
+| AE | Total traiteur AZ | 🔒 Formule |
+| AF–AJ | Commande AZ (Lingo, Stras, Eckbo, Schilic, Illkirch) | |
+| AK | Total commande AZ | 🔒 Formule |
+| AL | **TOTAL GÉNÉRAL** = `G+M+S+Y+AE+AK` (exclut les Offerts) | 🔒 Formule |
+| AM | Libellé "Offerts" | |
+| AN–AR | Offerts (Lingo, Stras, Eckbo, Schilic, Illkirch) | |
+| AS | Total offerts | 🔒 Formule |
+
+> ℹ️ **Restructuration juin 2026 :** Le bloc Offerts a été déplacé après le TOTAL GÉNÉRAL. Avant : AL–AQ = Offerts, AR = TOTAL GÉNÉRAL. Après : AL = TOTAL GÉNÉRAL (sans Offerts), AM = libellé, AN–AS = Offerts. Le TOTAL GÉNÉRAL n'inclut **pas** les Offerts.
+
+> 🔒 **Colonnes protégées (mode strict)** sur l'onglet Ventilation CA TTC : **G, M, S, Y, AE, AK, AQ, AR**.
+
+> 🍽️ **Colonnes S et Y = source unique de `dashboard_traiteur.html`.** La colonne **S** (Total traiteur cuisine) et la colonne **Y** (Total traiteur magasin) alimentent le suivi journalier de l'activité traiteur. Les colonnes magasin **N→R** (cuisine) et **T→X** (magasin) alimentent ses blocs par magasin. La colonne **AL** sert à détecter si un jour a été saisi, et la somme des 6 catégories pour un magasin donné sert à compter **ses** jours travaillés.
 
 ---
 
@@ -842,7 +878,7 @@ Pour chaque catégorie : 5 colonnes magasins (Lingo, Stras, Eckbo, Schilic, Illk
 **Projet Apps Script :** "LPP Suivi CA"
 **URL déployée :** `https://script.google.com/macros/s/AKfycbycKoHGdiUe0MREknK8zrduuIou2yqfRMyLo8MSEPN0xxe4F4W3m0w23Y1dT-of9PBU/exec`
 
-Cette URL est **identique pour les 3 dashboards**. Le paramètre `type` détermine quelles données sont retournées.
+Cette URL est **identique pour les 4 dashboards**. Le paramètre `type` détermine quelles données sont retournées.
 
 #### Fichiers dans l'éditeur Apps Script
 
@@ -865,6 +901,16 @@ Cette URL est **identique pour les 3 dashboards**. Le paramètre `type` détermi
 - Lit l'onglet `Ventilation CA TTC`
 - Retourne `{ status:'ok', data: [...] }`
 - Utilisé par : `dashboard_ttc.html`
+
+**Appel avec `?type=traiteur` :** *(ajouté le 9 novembre 2026)*
+- Lit l'onglet `Ventilation CA TTC` au **grain journalier** (une ligne par jour, pas d'agrégat mensuel)
+- Lit l'onglet `Calendrier`
+- Retourne `{ status:'ok', kind:'traiteur', data: [...], calendrier: {...} }`
+- Utilisé par : `dashboard_traiteur.html`
+
+> ℹ️ Le champ **`kind:'traiteur'`** est la signature de la branche. `dashboard_traiteur.html` le teste au chargement : s'il est absent (Apps Script pas encore redéployé), il bascule automatiquement sur la lecture directe du CSV du Google Sheet. Aucune panne pendant la transition.
+
+> ℹ️ La lecture de l'onglet `Calendrier` a été sortie de `doGet()` dans une fonction **`readCalendrier(ss)`**, partagée par la branche historique et la branche traiteur. Comportement strictement identique à l'ancien code inline.
 
 #### Structure JSON retournée — branche historique
 
@@ -921,6 +967,41 @@ Cette URL est **identique pour les 3 dashboards**. Le paramètre `type` détermi
 }
 ```
 
+#### Structure JSON retournée — branche traiteur
+
+```json
+{
+  "status": "ok",
+  "kind": "traiteur",
+  "data": [
+    {
+      "y": 2026, "m": 11, "d": 4,
+      "cuisine": 116.00,
+      "magasin": 681.69,
+      "grand":   7151.01,
+      "cuisineSites": [0, 0, 116.00, 0, 0],
+      "magasinSites": [197.91, 109.95, 0, 0, 373.83],
+      "siteTotals":   [1296.16, 748.40, 1681.69, 2125.59, 2379.37]
+    }
+  ],
+  "calendrier": { "novembre": { "2025": 19, "2026": 20 } }
+}
+```
+
+| Champ | Contenu | Colonne source |
+|-------|---------|----------------|
+| `y`, `m`, `d` | Année, mois, jour | En-tête de mois + colonne A |
+| `cuisine` | Traiteur cuisine, total 5 magasins | **S** |
+| `magasin` | Traiteur magasin, total 5 magasins | **Y** |
+| `grand` | TOTAL GÉNÉRAL du jour — si `0`, le jour n'est pas saisi | **AL** |
+| `cuisineSites` | Traiteur cuisine par magasin (Lingo→Illkirch) | **N→R** |
+| `magasinSites` | Traiteur magasin par magasin (Lingo→Illkirch) | **T→X** |
+| `siteTotals` | CA TTC du jour par magasin = somme des 6 catégories | B+H+N+T+Z+AF décalées |
+
+> ℹ️ `siteTotals` permet de compter les jours travaillés **de chaque magasin séparément**. Contrôle de cohérence : la somme des 5 valeurs est égale à `grand`, jour par jour.
+
+---
+
 #### Redéployer après modification de Code.gs
 
 > ⚠️ **Obligatoire après toute modification.** Modifier et sauvegarder sans redéployer n'a aucun effet sur l'URL publique.
@@ -938,7 +1019,7 @@ Cette URL est **identique pour les 3 dashboards**. Le paramètre `type` détermi
 **Dépôt GitHub :** https://github.com/deepblue67/lpp
 **GitHub Pages :** https://deepblue67.github.io/lpp/
 
-3 fichiers HTML autonomes — aucun framework, aucune dépendance serveur. Chaque fichier contient son propre CSS, son propre JavaScript, et fetchent directement l'Apps Script URL au chargement.
+4 fichiers HTML autonomes — aucun framework, aucune dépendance serveur. Chaque fichier contient son propre CSS, son propre JavaScript, et fetchent directement l'Apps Script URL au chargement.
 
 **Dépendances communes (CDN) :**
 - Google Fonts Inter : `fonts.googleapis.com`
@@ -1143,6 +1224,80 @@ let CHARTS = {};               // Instances Chart.js par magasin
 
 ---
 
+#### `dashboard_traiteur.html` — Suivi journalier Activité Traiteur
+
+**URL publique :** https://deepblue67.github.io/lpp/dashboard_traiteur.html
+**Source :** `?type=traiteur` — avec **repli automatique** sur l'export CSV du Google Sheet
+**Données utilisées :** `Ventilation CA TTC` (grain journalier) + `Calendrier`
+
+**Objectif :** suivre au jour le jour l'activité traiteur, dans la même logique que les dashboards magasins — un objectif tiré du N-1, une jauge d'avancement, et le CA/jour restant à réaliser.
+
+> ⚠️ **Montants TTC**, contrairement à `dashboard_ht.html` et `dashboard_moy_jour.html` qui sont en HT. C'est la nature de l'onglet source.
+
+##### Les deux sources de données
+
+| Priorité | Source | Condition |
+|----------|--------|-----------|
+| 1 | `?type=traiteur` de l'Apps Script | Réponse contenant `kind:'traiteur'` |
+| 2 | Export CSV de l'onglet : `/export?format=csv&gid=302831474` | Repli si la branche n'existe pas |
+
+Le bandeau en haut à droite indique la source réellement utilisée. Le repli CSV n'exige aucun redéploiement, mais **dépend du partage en lecture du Google Sheet** (« Tout utilisateur disposant du lien »).
+
+##### Filtres
+
+- **Mois** : tous les mois contenant au moins un jour saisi
+- **Activité** : `Total traiteur` / `Cuisine` (col. S) / `Magasins` (col. Y) — pilote les blocs par magasin et les blocs C à G
+- **Historique** : 6 / 12 / 18 mois ou tout
+- **Blocs affichés** : chaque bloc se masque par une case à cocher, mémorisée en `localStorage`
+
+##### Calcul des objectifs
+
+Identique aux dashboards magasins, appliqué au traiteur :
+
+| Donnée | Formule |
+|--------|---------|
+| Moy/j N-1 | CA traiteur du même mois N-1 ÷ jours travaillés N-1 |
+| **Objectif N** | Moy/j N-1 × jours travaillés N *(objectif glissant)* |
+| Jauge | CA réel N ÷ Objectif N × 100 |
+| Objectif fin de mois | Moy/j N-1 × jours prévus (onglet `Calendrier`) |
+| CA/j à réaliser | (Objectif fin de mois − CA réel N) ÷ jours restants |
+
+**Jours travaillés :** pour les blocs globaux, un jour compte si la colonne **AL** est > 0. Pour un **bloc magasin**, un jour compte si le CA TTC de **ce magasin** est > 0 — chaque magasin a donc son propre dénominateur.
+
+##### Contenu du dashboard
+
+**En tête — 5 blocs par magasin** (structure identique à `dashboard_moy_jour.html`) : panneau gauche 272 px avec jauge segmentée + Moy/j N-1, Moy/j N, Objectif N, CA réel N, Écart vs objectif et le bloc « CA/j à réaliser » ; panneau droit avec l'historique mensuel N vs N-1, badges % au-dessus des barres, et les bascules **Barres/Courbes** et **CA total/Moy jour** indépendantes par magasin.
+
+**Puis 9 blocs transverses :**
+
+| Bloc | Contenu |
+|------|---------|
+| A · Synthèse du mois | 6 KPI : cuisine, magasins, total, moy/jour, meilleur jour, part du traiteur dans le CA TTC |
+| B · Jauges & objectifs | 3 jauges : Traiteur cuisine, Traiteur magasins, Total traiteur |
+| C · Calendrier du mois | Grille mensuelle, chaque jour coloré selon son % de la moy/j N-1 |
+| D · Tableau jour par jour | Cuisine / magasins / total / N-1 / écart / cumul / objectif cumulé |
+| E · Course au cumul | Cumul réel N vs objectif cumulé vs cumul N-1 |
+| F · Barres journalières | Cuisine + magasins empilés vs même jour N-1, ligne moy/j N-1 |
+| G · Profil jour de semaine | Moyenne par jour de la semaine, N vs N-1 |
+| H · Historique mensuel | Barres empilées + tableau avec part du CA TTC |
+| I · Détail par magasin | 2 donuts (cuisine / magasins) + tableau — colonnes N→R et T→X |
+
+##### Variables et fonctions JavaScript clés
+
+| Élément | Rôle |
+|---------|------|
+| `DAYS` | Tous les jours, tous mois confondus |
+| `BYMONTH` | `'2026-11'` → tableau des jours du mois |
+| `MONTHS` | Mois contenant au moins un jour saisi, triés |
+| `SCOPE` | `'total'` / `'cuisine'` / `'magasin'` — état du filtre Activité |
+| `parseVentilationCSV(text)` | Parse le CSV brut de l'onglet (voie de repli) |
+| `statsOf(key)` | Statistiques d'un mois, tous magasins |
+| `statsOfSite(key, idx)` | Statistiques d'un mois pour **un** magasin |
+| `blockMagasins(key)` | Génère les 5 blocs magasins en tête de page |
+| `drawSiteChart(site, idx, key, nb)` | Graphique historique d'un magasin, avec badges % |
+
+---
+
 ### 4. Fichiers locaux de travail
 
 Tous dans `C:\Users\cdesmottes\Downloads\20260612\`
@@ -1156,12 +1311,20 @@ Tous dans `C:\Users\cdesmottes\Downloads\20260612\`
 | `stores_full_juin2026.json` | JSON | Version complète (archive) | Archive |
 | `store_data_block.txt` | Texte | Bloc brut (archive) | Archive |
 | `updateJuin2026.gs` | Apps Script | Import Juin 2026 dans les 7 onglets GS | ✅ Exécuté — ne pas relancer |
+| `updateJuin2026_J12_25.gs` | Apps Script | Import Juin 2026 jours 12–25 (5 magasins + Ventilation CA TTC) | ✅ Exécuté — ne pas relancer |
 | `createCalendrier.gs` | Apps Script | Création de l'onglet Calendrier | ✅ Exécuté — ne pas relancer |
-| `Code.gs` | Apps Script | Copie locale du doGet() de Apps Script | Référence pour maintenance |
+| `fixColonnesICS.gs` | Apps Script | Fige la colonne C en valeur, ajoute formules I et S sur tous les mois | ✅ Exécuté — ne pas relancer |
+| `fixProtectMagasins.gs` | Apps Script | Corrige les protections des 5 onglets magasins (cols F, I, S, T) | ✅ Exécuté — relancer si protections perdues |
+| `protectFormules.gs` | Apps Script | Protège SYNTHESE CA HT, HISTORIQUE CA HT et cols G,M,S,Y,AE,AK,AQ,AR de Ventilation CA TTC | ✅ Exécuté — relancer si protections perdues |
+| `restructureVentilationTTC.gs` | Apps Script | Déplace le bloc Offerts après TOTAL GÉNÉRAL dans Ventilation CA TTC | ✅ Exécuté — ne pas relancer |
+| `fixFormatOfferts.gs` | Apps Script | Corrige le formatage du bloc Offerts (AM-AS) après restructuration | ✅ Exécuté — relancer si formatage perdu |
+| `Code.gs` | Apps Script | Copie locale du doGet() — **contient la branche `?type=traiteur`** | Référence pour maintenance |
+| `Code_v1_avant_traiteur.gs` | Apps Script | Version du doGet() avant l'ajout de la branche traiteur | Sauvegarde / rollback |
 | `snippet_doGet_calendrier.gs` | Apps Script | Archive du snippet Calendrier ajouté à doGet() | Référence uniquement |
 | `dashboard_moy_jour.html` | HTML | Dashboard principal Moy/Jour | Déployer sur GitHub Pages |
 | `dashboard_ht.html` | HTML | Dashboard Analyse CA HT | Déployer sur GitHub Pages |
 | `dashboard_ttc.html` | HTML | Dashboard Ventilation CA TTC | Déployer sur GitHub Pages |
+| `dashboard_traiteur.html` | HTML | Dashboard Suivi journalier Activité Traiteur | Déployer sur GitHub Pages |
 | `README.md` | Markdown | Ce fichier de documentation | À maintenir |
 
 ---
@@ -1255,7 +1418,22 @@ Si ce mapping est mal appliqué, toutes les colonnes à partir de R ou Y seront 
 
 #### ⚠️ Scripts one-shot — ne jamais relancer
 
-`updateJuin2026.gs` et `createCalendrier.gs` ont déjà été exécutés. Les relancer écraserait des données existantes. Pour un nouveau mois, créer un nouveau fichier (ex: `updateJuillet2026.gs`).
+`updateJuin2026.gs`, `updateJuin2026_J12_25.gs`, `createCalendrier.gs`, `fixColonnesICS.gs` et `restructureVentilationTTC.gs` ont déjà été exécutés. Les relancer écraserait des données existantes ou re-restructurerait des colonnes déjà en place. Pour un nouveau mois, créer un nouveau fichier (ex: `updateJuillet2026.gs`).
+
+#### ⚠️ Colonne C (CAISSE TTC) — ne jamais mettre de formule
+
+La colonne C des onglets magasins est une **valeur saisie**. Si on y met une formule du type `=H+I+J+...`, cela crée une dépendance circulaire avec la colonne I (ESPECES = `=C-J-K-L-H-M-P-N-O`). Le GSheet affiche alors `#REF!` sur toutes les lignes. Corriger en restaurant une version précédente via **Fichier → Historique des versions**.
+
+#### ℹ️ Protections — récapitulatif
+
+| Onglet | Ce qui est protégé | Script |
+|--------|-------------------|--------|
+| Lingo, Stras, Eckbo, Schilic, Illkirch | Colonnes **F, I, S, T** | `fixProtectMagasins.gs` |
+| SYNTHESE CA HT | Onglet entier | `protectFormules.gs` |
+| HISTORIQUE CA HT | Onglet entier | `protectFormules.gs` |
+| Ventilation CA TTC | Colonnes **G, M, S, Y, AE, AK, AQ, AR** | `protectFormules.gs` |
+
+Protection en mode **strict** : les non-propriétaires reçoivent un message de blocage et ne peuvent pas modifier.
 
 #### ⚠️ Redéploiement Apps Script obligatoire après modification de Code.gs
 
@@ -1273,6 +1451,18 @@ Si l'onglet `HISTORIQUE CA HT` ne contient pas de données pour le même mois de
 
 Le champ `nb_jours` dans `HISTORIQUE CA HT` représente le nombre de jours **déjà saisis**, pas le total prévu. Il augmente à chaque mise à jour des données. L'Objectif N dans le dashboard est donc un "objectif glissant" qui évolue avec le nombre de jours travaillés, pas un objectif fixe de fin de mois. C'est le Calendrier qui fournit la cible fixe de fin de mois.
 
+#### ⚠️ Traiteur — pas de N-1 avant octobre 2026
+
+L'onglet `Ventilation CA TTC` démarre en **octobre 2025**. `dashboard_traiteur.html` ne peut donc afficher objectifs, jauges et comparatifs N-1 qu'à partir d'**octobre 2026**. Pour les mois antérieurs, un bandeau orange l'indique et les colonnes N-1 affichent `—` ; les blocs de suivi du mois restent lisibles.
+
+#### ⚠️ Traiteur — le repli CSV dépend du partage du Google Sheet
+
+Tant que l'Apps Script n'expose pas `?type=traiteur`, `dashboard_traiteur.html` lit directement l'export CSV de l'onglet. Cela ne fonctionne que si le Sheet est partagé en lecture « **Tout utilisateur disposant du lien** ». Si ce partage est restreint un jour, le dashboard traiteur tombe en panne alors que les 3 autres continuent de fonctionner — c'est la raison d'être de la branche `?type=traiteur`.
+
+#### ⚠️ Un seul `doGet()` par projet Apps Script
+
+Ne jamais **ajouter** une seconde version de `Code.gs` comme fichier supplémentaire dans le projet « LPP Suivi CA ». Avec deux fonctions `doGet()` dans un même projet, Apps Script n'en garde qu'une, sans message d'erreur, et les dashboards tombent en panne de façon imprévisible. Toute évolution est un **remplacement du contenu** de `Code.gs`.
+
 #### ℹ️ Accès public Apps Script (CORS)
 
 Le `doGet()` est déployé avec accès **"Tout le monde"** (anonyme). C'est nécessaire pour que les dashboards HTML puissent le fetcher sans authentification. Ne pas restreindre l'accès aux utilisateurs connectés — les dashboards cessent de fonctionner.
@@ -1288,10 +1478,12 @@ Le `doGet()` est déployé avec accès **"Tout le monde"** (anonyme). C'est néc
 - **Comparaison N vs N-2** : ajouter une deuxième référence historique
 - **Mobile** : la grille 270px + chart est responsive à partir de 1000px, à améliorer pour smartphone
 - **Export PDF** : bouton d'impression formatée pour les réunions de direction
+- **Traiteur — profondeur d'historique** : reprendre les années antérieures à octobre 2025 dans `Ventilation CA TTC` pour activer les objectifs N-1 sur tous les mois
+- **Traiteur — objectif par magasin** : objectif saisi manuellement par magasin plutôt que calculé sur le N-1
 
 ---
 
-*Dernière mise à jour : 17 juin 2026*
+*Dernière mise à jour : 9 novembre 2026 — ajout de `dashboard_traiteur.html` et de la branche `?type=traiteur`*
 *Magasins : Lingolsheim · Strasbourg · Eckbolsheim · Schiltigheim · Illkirch*
 
 ---

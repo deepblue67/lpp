@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>La Petite Pause — Suivi journalier Activité Traiteur</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#2E4E8C;--indigo:#5072B8;--indigo-mid:#6A8FCC;--indigo-light:#C8D8F0;--indigo-pale:#EBF0FA;
+    --amber:#E8A020;--coral:#E05A4A;--bg:#F2F5FC;--card:#FFFFFF;
+    --text:#1A2440;--text-light:#5A6A8A;--border:#D5DFF0;
+    --cuisine:#ED7D31;--cuisine-pale:#FDF1E7;
+    --magasin:#9966CC;--magasin-pale:#F4EDFB;
+    --total:#2E4E8C;--total-pale:#EBF0FA;
+    --green:#28A745;--green-pale:#D4EDDA;--green-dark:#155724;
+    --red:#DC3545;--red-pale:#F8D7DA;--red-dark:#721C24;
+    --shadow:0 2px 12px rgba(26,43,82,.10);--shadow-hover:0 6px 24px rgba(26,43,82,.18);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+  header{background:linear-gradient(135deg,var(--navy) 0%,#1E3A7A 100%);padding:0 32px;display:flex;align-items:center;justify-content:space-between;min-height:80px;box-shadow:0 2px 16px rgba(0,0,0,.25);position:sticky;top:0;z-index:100;}
+  .header-left{display:flex;align-items:center;gap:14px;}
+  .header-title h1{color:#fff;font-size:18px;font-weight:700;letter-spacing:.3px;}
+  .header-title p{font-size:11px;color:var(--indigo-light);font-weight:400;margin-top:1px;}
+  .header-center{text-align:center;color:#fff;}
+  .header-center h2{font-size:21px;font-weight:800;letter-spacing:.2px;}
+  .header-center p{font-size:11.5px;color:var(--indigo-light);margin-top:3px;font-weight:400;}
+  .header-right{display:flex;align-items:center;gap:10px;}
+  #last-update{font-size:11px;color:var(--indigo-light);text-align:right;line-height:1.4;}
+  .btn-refresh{background:var(--indigo-mid);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .2s;white-space:nowrap;}
+  .btn-refresh:hover{background:var(--indigo);}
+
+  .filters-bar{background:var(--card);border-bottom:1px solid var(--border);padding:12px 32px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:80px;z-index:90;}
+  .filter-label{font-size:11.5px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;}
+  .filter-select{border:1.5px solid var(--border);border-radius:8px;padding:7px 12px;font-size:13px;font-family:inherit;color:var(--text);background:#fff;cursor:pointer;outline:none;transition:border-color .2s;}
+  .filter-select:focus{border-color:var(--indigo-mid);}
+  .seg{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;}
+  .seg button{border:none;background:#fff;color:var(--text-light);font-family:inherit;font-size:12px;font-weight:600;padding:7px 13px;cursor:pointer;transition:all .15s;}
+  .seg button+button{border-left:1.5px solid var(--border);}
+  .seg button.active{background:var(--navy);color:#fff;}
+  .seg button:hover:not(.active){background:var(--indigo-pale);}
+  .divider{width:1px;height:26px;background:var(--border);}
+
+  .blocks-bar{background:#E7EEFA;border-bottom:1px solid var(--border);padding:10px 32px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .blocks-bar .filter-label{margin-right:2px;}
+  .chk{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid var(--border);border-radius:99px;padding:5px 12px 5px 9px;font-size:11.5px;font-weight:600;color:var(--text-light);cursor:pointer;user-select:none;transition:all .15s;}
+  .chk input{accent-color:var(--navy);cursor:pointer;margin:0;}
+  .chk.on{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .blocks-hint{font-size:11px;color:var(--text-light);font-style:italic;margin-left:auto;}
+
+  main{padding:24px 32px 8px;max-width:1500px;margin:0 auto;}
+  .block{background:var(--card);border-radius:16px;box-shadow:var(--shadow);margin-bottom:22px;overflow:hidden;}
+  .block-head{padding:13px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .block-title{font-size:15.5px;font-weight:800;display:flex;align-items:center;gap:9px;}
+  .block-tag{font-size:9.5px;font-weight:800;letter-spacing:.6px;background:var(--indigo-pale);color:var(--navy);border-radius:5px;padding:3px 7px;text-transform:uppercase;}
+  .block-sub{font-size:11px;color:var(--text-light);font-weight:400;margin-top:2px;}
+  .block-body{padding:18px 22px 20px;}
+  .block.hidden,.hidden{display:none;}
+
+  /* KPI */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
+  .kpi{background:var(--indigo-pale);border-radius:12px;padding:13px 15px;border-left:4px solid var(--navy);}
+  .kpi.c{border-left-color:var(--cuisine);background:var(--cuisine-pale);}
+  .kpi.m{border-left-color:var(--magasin);background:var(--magasin-pale);}
+  .kpi-label{font-size:9.5px;font-weight:800;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:4px;}
+  .kpi-value{font-size:22px;font-weight:800;margin-top:5px;line-height:1.1;}
+  .kpi-sub{font-size:10.5px;color:var(--text-light);margin-top:4px;line-height:1.35;}
+
+  /* Blocs par magasin (même structure que dashboard_moy_jour.html) */
+  .site-head{padding:13px 22px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+  .site-name{font-size:16.5px;font-weight:800;display:flex;align-items:center;gap:10px;}
+  .site-meta{font-size:12px;color:var(--text-light);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .days-badge{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;color:#fff;}
+  .site-body{display:grid;grid-template-columns:272px 1fr;gap:0;}
+  .gauge-panel{padding:16px 18px 16px;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .gauge-title{font-size:11px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;text-align:center;}
+  .chart-panel{padding:16px 20px 16px;}
+  .toggle-btn{border:1.5px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;background:#fff;color:var(--text-light);transition:all .15s;white-space:nowrap;font-family:inherit;}
+  .toggle-btn.active{background:var(--indigo-mid);color:#fff;border-color:var(--indigo-mid);}
+  .toggle-btn:hover:not(.active){background:var(--indigo-pale);border-color:var(--indigo-mid);}
+  .mag-sep{display:flex;align-items:center;gap:12px;margin:2px 0 18px;}
+  .mag-sep span{font-size:11px;font-weight:800;color:var(--text-light);text-transform:uppercase;letter-spacing:.8px;white-space:nowrap;}
+  .mag-sep i{flex:1;height:1px;background:var(--border);}
+
+  /* Gauges */
+  .gauge-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px;}
+  .gauge-card{border:1.5px solid var(--border);border-radius:14px;padding:14px 16px 16px;display:flex;flex-direction:column;align-items:center;gap:9px;}
+  .gauge-card h3{font-size:14.5px;font-weight:800;display:flex;align-items:center;gap:8px;}
+  .dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+  .gauge-meta{font-size:11px;color:var(--text-light);text-align:center;}
+  .metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;}
+  .metric-item{background:var(--indigo-pale);border-radius:9px;padding:9px 11px;}
+  .metric-item.full{grid-column:1/-1;}
+  .metric-label{font-size:9px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;display:flex;align-items:center;gap:4px;}
+  .metric-value{font-size:13.5px;font-weight:700;color:var(--text);line-height:1.2;}
+  .ecart-pos{background:var(--green-pale);}
+  .ecart-pos .metric-label,.ecart-pos .metric-value{color:var(--green-dark);}
+  .ecart-neg{background:var(--red-pale);}
+  .ecart-neg .metric-label,.ecart-neg .metric-value{color:var(--red-dark);}
+  .projection-block{width:100%;background:var(--navy);border-radius:10px;padding:12px 14px;text-align:center;}
+  .proj-label{font-size:9px;font-weight:700;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:flex;align-items:center;justify-content:center;gap:4px;}
+  .proj-value{font-size:20px;font-weight:800;color:#fff;line-height:1.1;}
+  .proj-sub{font-size:9px;color:rgba(255,255,255,.5);margin-top:5px;line-height:1.4;}
+  .proj-missing{font-size:10px;color:rgba(255,255,255,.5);font-style:italic;padding:4px 0;}
+
+  /* tooltips */
+  .tip-wrap{position:relative;display:inline-flex;align-items:center;}
+  .tip-icon{width:13px;height:13px;border-radius:50%;background:var(--indigo-mid);color:#fff;font-size:8px;font-weight:700;font-style:normal;display:inline-flex;align-items:center;justify-content:center;cursor:default;flex-shrink:0;line-height:1;}
+  .tip-box{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;line-height:1.45;padding:7px 10px;border-radius:7px;width:210px;white-space:normal;pointer-events:none;opacity:0;transition:opacity .15s;z-index:99;box-shadow:0 4px 12px rgba(0,0,0,.3);}
+  .tip-box::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:#1e293b;}
+  .tip-wrap:hover .tip-box{opacity:1;}
+
+  /* calendrier heatmap */
+  .cal-wrap{display:flex;flex-direction:column;gap:8px;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;}
+  .cal-dow{font-size:10px;font-weight:800;color:var(--text-light);text-transform:uppercase;letter-spacing:.5px;text-align:center;padding-bottom:2px;}
+  .cal-cell{border-radius:10px;padding:7px 8px 8px;min-height:74px;border:1.5px solid var(--border);background:#fff;display:flex;flex-direction:column;gap:2px;position:relative;}
+  .cal-cell .cd{font-size:11px;font-weight:800;color:var(--text-light);}
+  .cal-cell .cv{font-size:14px;font-weight:800;line-height:1.1;margin-top:1px;}
+  .cal-cell .cs{font-size:9.5px;color:var(--text-light);line-height:1.3;}
+  .cal-cell .cb{position:absolute;top:6px;right:7px;font-size:9px;font-weight:800;border-radius:4px;padding:1px 4px;}
+  .cal-empty{background:transparent;border:none;}
+  .cal-today{box-shadow:0 0 0 2px var(--amber);}
+  .cal-closed{background:#F4F6FB;border-style:dashed;}
+  .cal-future{background:#FAFBFE;border-style:dashed;opacity:.75;}
+  .cal-good{background:var(--green-pale);border-color:#9BD3A8;}
+  .cal-mid{background:#FFF3D6;border-color:#F0CF86;}
+  .cal-bad{background:var(--red-pale);border-color:#EDA8B0;}
+  .cal-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:var(--text-light);align-items:center;}
+  .cal-legend span.sw{width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-2px;border:1px solid var(--border);}
+
+  /* tables */
+  .tbl-scroll{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{background:var(--indigo-pale);color:var(--navy);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;padding:9px 8px;text-align:right;white-space:nowrap;border-bottom:2px solid var(--border);position:sticky;top:0;}
+  thead th:first-child,thead th.l{text-align:left;}
+  tbody td{padding:7px 8px;text-align:right;border-bottom:1px solid #EDF1F9;white-space:nowrap;}
+  tbody td.l{text-align:left;}
+  tbody tr:hover{background:#F7FAFF;}
+  tbody tr.we td{color:#92A0BC;background:#FBFCFE;}
+  tbody tr.future td{color:#B4BFD4;font-style:italic;}
+  tbody tr.today td{box-shadow:inset 0 0 0 2px var(--amber);}
+  tfoot td{padding:9px 8px;text-align:right;font-weight:800;border-top:2px solid var(--border);background:#F7FAFF;}
+  tfoot td.l{text-align:left;}
+  .pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:5px;padding:2px 6px;min-width:52px;text-align:center;}
+  .pill.up{background:var(--green-pale);color:var(--green-dark);}
+  .pill.down{background:var(--red-pale);color:var(--red-dark);}
+  .pill.flat{background:#FFF3D6;color:#8A6410;}
+  .pill.na{background:#EEF1F7;color:#8795AF;}
+  .bar-cell{position:relative;min-width:120px;}
+  .bar-bg{position:absolute;left:0;top:50%;transform:translateY(-50%);height:16px;border-radius:4px;opacity:.28;}
+
+  .chart-box{position:relative;height:330px;}
+  .chart-box.sm{height:260px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .grid-donut{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;}
+
+  .note{background:#FFF8E6;border:1px solid #F0D9A0;border-left:4px solid var(--amber);border-radius:10px;padding:11px 14px;font-size:12px;color:#6B5418;line-height:1.5;margin-bottom:18px;}
+  .note b{font-weight:800;}
+  .loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:320px;gap:16px;color:var(--text-light);}
+  .spinner{width:36px;height:36px;border:3px solid var(--indigo-light);border-top-color:var(--navy);border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  footer{text-align:center;padding:22px;font-size:11.5px;color:var(--text-light);border-top:1px solid var(--border);margin-top:8px;line-height:1.6;}
+
+  @media(max-width:1100px){.grid2{grid-template-columns:1fr;}header{flex-wrap:wrap;gap:10px;padding:12px 18px;}.header-center{order:3;width:100%;text-align:left;}.filters-bar{position:static;}}
+  @media(max-width:1000px){.site-body{grid-template-columns:1fr;}.gauge-panel{border-right:none;border-bottom:1px solid var(--border);}}
+  @media(max-width:700px){main{padding:16px;}.filters-bar,.blocks-bar{padding:10px 16px;}.cal-grid{gap:4px;}.cal-cell{min-height:62px;padding:5px;}.cal-cell .cv{font-size:12px;}}
+  @media print{
+    header,.filters-bar,.blocks-bar,.btn-refresh{display:none!important;}
+    .block{box-shadow:none;border:1px solid #ccc;break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 100 100" aria-hidden="true">
+      <circle cx="50" cy="50" r="24" fill="white"/>
+      <text x="50" y="58" text-anchor="middle" font-size="30" font-weight="bold" fill="#2E4E8C" font-family="Arial">$</text>
+      <path d="M18 30 Q50 10 82 30" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"/>
+      <polygon points="82,30 70,22 78,42" fill="white"/>
+      <path d="M82 70 Q50 90 18 70" fill="none" stroke="white" stroke-width="7" stroke-linecap="round"/>
+      <polygon points="18,70 30,78 22,58" fill="white"/>
+    </svg>
+    <div class="header-title">
+      <h1>La Petite Pause</h1>
+      <p>Activité Traiteur</p>
+    </div>
+  </div>
+  <div class="header-center">
+    <h2>Suivi journalier — Activité Traiteur</h2>
+    <p>Traiteur cuisine (col. S) &amp; Traiteur magasins (col. Y) · Objectif = moy/jour N-1 × jours travaillés N</p>
+  </div>
+  <div class="header-right">
+    <span id="last-update">—</span>
+    <button class="btn-refresh" onclick="loadData()">↻ Actualiser</button>
+  </div>
+</header>
+
+<div class="filters-bar">
+  <span class="filter-label">Mois</span>
+  <select class="filter-select" id="f-month" onchange="render()"></select>
+  <div class="divider"></div>
+  <span class="filter-label">Activité</span>
+  <div class="seg" id="f-scope">
+    <button data-v="total" class="active" onclick="setScope('total')">Total traiteur</button>
+    <button data-v="cuisine" onclick="setScope('cuisine')">Cuisine</button>
+    <button data-v="magasin" onclick="setScope('magasin')">Magasins</button>
+  </div>
+  <div class="divider"></div>
+  <span class="filter-label">Historique</span>
+  <select class="filter-select" id="f-hist" onchange="render()">
+    <option value="6">6 mois</option>
+    <option value="12" selected>12 mois</option>
+    <option value="18">18 mois</option>
+    <option value="99">Tout</option>
+  </select>
+</div>
+
+<div class="blocks-bar" id="blocks-bar">
+  <span class="filter-label">Blocs affichés</span>
+  <!-- rempli par JS -->
+  <span class="blocks-hint">Décochez librement : votre choix est mémorisé dans ce navigateur.</span>
+</div>
+
+<main>
+  <div id="content">
+    <div class="loading"><div class="spinner"></div><span>Chargement des données…</span></div>
+  </div>
+</main>
+
+<footer>
+  Dashboard La Petite Pause — Suivi journalier Activité Traiteur<br/>
+  Source : onglet <b>Ventilation CA TTC</b> du Livre de Caisse · Traiteur cuisine = colonne S · Traiteur magasins = colonne Y · Montants <b>TTC</b>
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONFIGURATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+const SHEET_ID        = '1jh3Mce91LvENKRVGDsfAru1hRGvo7Uz1Ge2FsHYSw-k';
+const GID_VENTILATION = '302831474';                   // onglet « Ventilation CA TTC »
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycKoHGdiUe0MREknK8zrduuIou2yqfRMyLo8MSEPN0xxe4F4W3m0w23Y1dT-of9PBU/exec';
+const CSV_URL         = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_VENTILATION}`;
+
+// Colonnes de l'onglet Ventilation CA TTC (index 0 = colonne A)
+const COL = {
+  jour:0,
+  cuisineSites:[13,14,15,16,17],  // N O P Q R
+  cuisineTotal:18,                // S  ← Traiteur cuisine
+  magasinSites:[19,20,21,22,23],  // T U V W X
+  magasinTotal:24,                // Y  ← Traiteur magasins
+  grandTotal:37,                  // AL ← TOTAL GÉNÉRAL (sert à détecter un jour saisi)
+  // 1re colonne magasin de chacune des 6 catégories de CA (midi, livraison,
+  // traiteur cuisine, traiteur magasin, traiteur AZ, commande AZ) : la somme
+  // donne le CA TTC du jour POUR UN magasin → sert à compter ses jours travaillés.
+  catStarts:[1,7,13,19,25,31]
+};
+
+const SITES       = ['Lingo','Stras','Eckbo','Schilic','Illkirch'];
+const SITE_NAMES  = {Lingo:'Lingolsheim',Stras:'Strasbourg',Eckbo:'Eckbolsheim',Schilic:'Schiltigheim',Illkirch:'Illkirch'};
+const SITE_COLORS = {Lingo:'#3B5998',Stras:'#E84393',Eckbo:'#FF8C00',Schilic:'#28A745',Illkirch:'#8B5CF6'};
+
+const C_CUISINE = '#ED7D31', C_MAGASIN = '#9966CC', C_TOTAL = '#2E4E8C', C_REF = '#B9C6DE';
+
+const MOIS_NOM  = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const MOIS_KEY  = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const MOIS_UP   = {'JANVIER':1,'FEVRIER':2,'FÉVRIER':2,'MARS':3,'AVRIL':4,'MAI':5,'JUIN':6,'JUILLET':7,'AOUT':8,'AOÛT':8,'SEPTEMBRE':9,'OCTOBRE':10,'NOVEMBRE':11,'DECEMBRE':12,'DÉCEMBRE':12};
+const DOW       = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+const DOW_LONG  = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+
+const BLOCKS = [
+  {id:'bmag', label:'★ · Blocs par magasin',     def:true},
+  {id:'b0', label:'A · Synthèse du mois',        def:true},
+  {id:'b1', label:'B · Jauges & objectifs',      def:true},
+  {id:'b2', label:'C · Calendrier du mois',      def:true},
+  {id:'b3', label:'D · Tableau jour par jour',   def:true},
+  {id:'b4', label:'E · Course au cumul',         def:true},
+  {id:'b5', label:'F · Barres journalières N/N-1',def:true},
+  {id:'b6', label:'G · Profil jour de semaine',  def:true},
+  {id:'b7', label:'H · Historique mensuel',      def:true},
+  {id:'b8', label:'I · Détail par magasin',      def:true}
+];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ÉTAT
+   ═══════════════════════════════════════════════════════════════════════════ */
+let DAYS = [];        // [{y,m,d,date,dow,cuisine,magasin,total,grand,saisi,cSites[],mSites[]}]
+let MONTHS = [];      // ['2026-11', ...] triés
+let BYMONTH = {};     // '2026-11' -> [jours]
+let CALENDRIER = {};  // {novembre:{'2026':20}}
+let CHARTS = {};
+let SCOPE = 'total';
+let SOURCE = '';
+let CUR_KEY = null, CUR_HIST = 12;
+const siteChartType   = {Lingo:'bar',Stras:'bar',Eckbo:'bar',Schilic:'bar',Illkirch:'bar'};
+const siteChartMetric = {Lingo:'ca', Stras:'ca', Eckbo:'ca', Schilic:'ca', Illkirch:'ca'};
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════════════════════════════════ */
+const nz   = v => (v===null||v===undefined||isNaN(v))?0:v;
+const fmt0 = n => (n===null||n===undefined||isNaN(n)) ? '—' : Math.round(n).toLocaleString('fr-FR');
+const fmtE = n => (n===null||n===undefined||isNaN(n)) ? '—' : Math.round(n).toLocaleString('fr-FR')+' €';
+const fmt1 = n => (n===null||n===undefined||isNaN(n)) ? '—' : n.toLocaleString('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1});
+const fmtK = n => {
+  if(n===null||n===undefined||isNaN(n)) return '—';
+  if(Math.abs(n)>=1000) return (n/1000).toFixed(1).replace('.',',')+' k€';
+  return fmt0(n)+' €';
+};
+const fmtPct = p => (p===null||p===undefined||isNaN(p)||!isFinite(p)) ? '—' : (p>0?'+':'')+p.toFixed(1).replace('.',',')+' %';
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function pill(p){
+  if(p===null||p===undefined||isNaN(p)||!isFinite(p)) return '<span class="pill na">—</span>';
+  const cls = p>=2 ? 'up' : (p<=-2 ? 'down' : 'flat');
+  return `<span class="pill ${cls}">${fmtPct(p)}</span>`;
+}
+function tip(txt){ return `<span class="tip-wrap"><i class="tip-icon">i</i><span class="tip-box">${txt}</span></span>`; }
+function monthKey(y,m){ return y+'-'+String(m).padStart(2,'0'); }
+function monthLabel(key){ const [y,m]=key.split('-'); return MOIS_NOM[+m-1]+' '+y; }
+function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
+function parseNum(v){
+  if(typeof v==='number') return isNaN(v)?0:v;
+  let s=String(v==null?'':v);
+  s=s.replace(/ | |\s/g,'').replace(/€/g,'').replace(/,/g,'.').trim();
+  if(s===''||s==='-'||s==='–'||s==='—') return 0;
+  const f=parseFloat(s);
+  return isNaN(f)?0:f;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHARGEMENT
+   ═══════════════════════════════════════════════════════════════════════════ */
+async function loadData(){
+  document.getElementById('content').innerHTML =
+    '<div class="loading"><div class="spinner"></div><span>Chargement des données…</span></div>';
+  document.getElementById('last-update').textContent = 'Chargement…';
+  try{
+    let rows = null;
+    // 1) voie « propre » : Apps Script ?type=traiteur (si Code.gs a été mis à jour)
+    try{
+      const r = await fetch(APPS_SCRIPT_URL+'?type=traiteur');
+      const j = await r.json();
+      CALENDRIER = j.calendrier || {};
+      if(j && j.kind==='traiteur' && Array.isArray(j.data)){
+        rows = j.data.map(o=>({
+          y:+o.y, m:+o.m, d:+o.d,
+          cuisine:nz(+o.cuisine), magasin:nz(+o.magasin), grand:nz(+o.grand),
+          cSites:(o.cuisineSites||[]).map(nz), mSites:(o.magasinSites||[]).map(nz),
+          sDay:(o.siteTotals||[]).map(nz)
+        }));
+        SOURCE = 'Apps Script (type=traiteur)';
+      }
+    }catch(e){ /* on bascule sur le CSV */ }
+
+    // 2) repli : lecture directe du CSV de l'onglet Ventilation CA TTC
+    if(!rows){
+      const r = await fetch(CSV_URL);
+      if(!r.ok) throw new Error('Lecture du Google Sheet impossible (HTTP '+r.status+')');
+      rows = parseVentilationCSV(await r.text());
+      SOURCE = 'Google Sheet (export CSV)';
+    }
+
+    buildIndex(rows);
+    document.getElementById('last-update').innerHTML =
+      'Mis à jour '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})+
+      '<br/><span style="opacity:.75">'+esc(SOURCE)+'</span>';
+    buildMonthSelect();
+    render();
+  }catch(e){
+    console.error(e);
+    document.getElementById('content').innerHTML =
+      `<div class="loading"><span style="font-size:40px">⚠️</span>
+       <span style="color:var(--coral);font-weight:600">Erreur : ${esc(e.message)}</span>
+       <span style="font-size:12px;max-width:520px;text-align:center">Vérifiez que le Google Sheet est partagé en lecture (« Tout utilisateur disposant du lien »).</span>
+       <button class="btn-refresh" onclick="loadData()">↻ Réessayer</button></div>`;
+    document.getElementById('last-update').textContent = 'Erreur';
+  }
+}
+
+/* --- parseur CSV (gère les guillemets et les virgules décimales) ----------- */
+function splitCSV(text){
+  const out=[]; let row=[], cell='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){
+      if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; }
+      else cell+=c;
+    }else{
+      if(c==='"') q=true;
+      else if(c===','){ row.push(cell); cell=''; }
+      else if(c==='\n'){ row.push(cell); out.push(row); row=[]; cell=''; }
+      else if(c==='\r'){ /* ignore */ }
+      else cell+=c;
+    }
+  }
+  if(cell!==''||row.length){ row.push(cell); out.push(row); }
+  return out;
+}
+
+function parseVentilationCSV(text){
+  const rows = splitCSV(text);
+  const get = (r,i)=> (r && r[i]!==undefined) ? r[i] : '';
+  const res = []; let cur = null;
+  const reMonth = /^([A-ZÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ]+)\s+(\d{4})$/;
+  for(const r of rows){
+    const a = String(get(r,COL.jour)).trim();
+    const m = reMonth.exec(a.toUpperCase());
+    if(m && MOIS_UP[m[1]]!==undefined){ cur = {y:+m[2], m:MOIS_UP[m[1]]}; continue; }
+    if(!cur) continue;
+    if(!/^\d{1,2}$/.test(a)) continue;           // ignore 'TOTAL', 'Jour', vides…
+    const d = +a;
+    if(d<1 || d>31) continue;
+    if(d > daysInMonth(cur.y,cur.m)) continue;
+    res.push({
+      y:cur.y, m:cur.m, d:d,
+      cuisine:parseNum(get(r,COL.cuisineTotal)),
+      magasin:parseNum(get(r,COL.magasinTotal)),
+      grand:parseNum(get(r,COL.grandTotal)),
+      cSites:COL.cuisineSites.map(i=>parseNum(get(r,i))),
+      mSites:COL.magasinSites.map(i=>parseNum(get(r,i))),
+      // CA TTC du jour par magasin = somme des 6 catégories pour ce magasin
+      sDay:[0,1,2,3,4].map(i=>COL.catStarts.reduce((a,c)=>a+parseNum(get(r,c+i)),0))
+    });
+  }
+  return res;
+}
+
+function buildIndex(rows){
+  DAYS=[]; BYMONTH={};
+  for(const r of rows){
+    const dt = new Date(r.y, r.m-1, r.d); dt.setHours(0,0,0,0);
+    const o = {
+      y:r.y, m:r.m, d:r.d, dt,
+      dow:(dt.getDay()+6)%7,                       // 0 = lundi
+      cuisine:nz(r.cuisine), magasin:nz(r.magasin), grand:nz(r.grand),
+      cSites:r.cSites||[], mSites:r.mSites||[], sDay:r.sDay||[],
+      future: dt > TODAY
+    };
+    o.total = o.cuisine + o.magasin;
+    o.saisi = o.grand > 0;                          // jour réellement enregistré en caisse
+    DAYS.push(o);
+    const k = monthKey(r.y,r.m);
+    (BYMONTH[k] = BYMONTH[k] || []).push(o);
+  }
+  // on ne garde que les mois qui contiennent au moins un jour saisi
+  MONTHS = Object.keys(BYMONTH).filter(k=>BYMONTH[k].some(x=>x.saisi)).sort();
+  Object.keys(BYMONTH).forEach(k=>BYMONTH[k].sort((a,b)=>a.d-b.d));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATISTIQUES
+   ═══════════════════════════════════════════════════════════════════════════ */
+function statsOf(key){
+  const days = BYMONTH[key] || [];
+  const saisis = days.filter(d=>d.saisi);
+  const s = {
+    key, exists: !!BYMONTH[key], label: monthLabel(key),
+    days, saisis, nbJours: saisis.length,
+    cuisine: saisis.reduce((a,d)=>a+d.cuisine,0),
+    magasin: saisis.reduce((a,d)=>a+d.magasin,0),
+    grand:   saisis.reduce((a,d)=>a+d.grand,0)
+  };
+  s.total = s.cuisine + s.magasin;
+  s.moyCuisine = s.nbJours ? s.cuisine/s.nbJours : null;
+  s.moyMagasin = s.nbJours ? s.magasin/s.nbJours : null;
+  s.moyTotal   = s.nbJours ? s.total  /s.nbJours : null;
+  // nb de jours avec au moins un € de traiteur
+  s.nbJoursTraiteur = saisis.filter(d=>d.total>0).length;
+  return s;
+}
+/** Mêmes statistiques, restreintes à UN magasin (index 0→4).
+ *  Les « jours travaillés » sont ceux du magasin lui-même (CA TTC du jour > 0),
+ *  pas ceux de l'ensemble du réseau. */
+function statsOfSite(key, idx){
+  const days = BYMONTH[key] || [];
+  const saisis = days.filter(d => (d.sDay && d.sDay.length===5) ? d.sDay[idx] > 0 : d.saisi);
+  const s = {
+    key, exists: !!BYMONTH[key], label: monthLabel(key),
+    days, saisis, nbJours: saisis.length,
+    cuisine: saisis.reduce((a,d)=>a+nz(d.cSites[idx]),0),
+    magasin: saisis.reduce((a,d)=>a+nz(d.mSites[idx]),0),
+    grand:   saisis.reduce((a,d)=>a+((d.sDay&&d.sDay.length===5)?nz(d.sDay[idx]):0),0)
+  };
+  s.total = s.cuisine + s.magasin;
+  s.moyCuisine = s.nbJours ? s.cuisine/s.nbJours : null;
+  s.moyMagasin = s.nbJours ? s.magasin/s.nbJours : null;
+  s.moyTotal   = s.nbJours ? s.total  /s.nbJours : null;
+  s.nbJoursTraiteur = saisis.filter(d=>nz(d.cSites[idx])+nz(d.mSites[idx])>0).length;
+  return s;
+}
+
+function prevYearKey(key){ const [y,m]=key.split('-'); return monthKey(+y-1,+m); }
+function joursPrevus(key){
+  const [y,m]=key.split('-');
+  const c = CALENDRIER[MOIS_KEY[+m-1]];
+  const v = c ? c[String(+y)] : null;
+  return (v && v>0) ? v : null;
+}
+const pick = (o,scope)=> scope==='cuisine'?o.cuisine : scope==='magasin'?o.magasin : o.total;
+const pickMoy = (s,scope)=> scope==='cuisine'?s.moyCuisine : scope==='magasin'?s.moyMagasin : s.moyTotal;
+const scopeLabel = s => s==='cuisine'?'Traiteur cuisine' : s==='magasin'?'Traiteur magasins' : 'Total traiteur';
+const scopeColor = s => s==='cuisine'?C_CUISINE : s==='magasin'?C_MAGASIN : C_TOTAL;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UI — sélecteurs
+   ═══════════════════════════════════════════════════════════════════════════ */
+function buildMonthSelect(){
+  const sel = document.getElementById('f-month');
+  const prev = sel.value;
+  sel.innerHTML = MONTHS.slice().reverse().map(k=>`<option value="${k}">${monthLabel(k)}</option>`).join('');
+  if(prev && MONTHS.includes(prev)) sel.value = prev;
+}
+function setScope(v){
+  SCOPE = v;
+  document.querySelectorAll('#f-scope button').forEach(b=>b.classList.toggle('active', b.dataset.v===v));
+  render();
+}
+function buildBlocksBar(){
+  const bar = document.getElementById('blocks-bar');
+  const hint = bar.querySelector('.blocks-hint');
+  BLOCKS.forEach(b=>{
+    const on = blockOn(b.id);
+    const lab = document.createElement('label');
+    lab.className = 'chk'+(on?' on':'');
+    lab.innerHTML = `<input type="checkbox" ${on?'checked':''}/> ${esc(b.label)}`;
+    lab.querySelector('input').addEventListener('change', e=>{
+      setBlock(b.id, e.target.checked);
+      lab.classList.toggle('on', e.target.checked);
+      applyBlockVisibility();
+    });
+    bar.insertBefore(lab, hint);
+  });
+}
+function blockOn(id){
+  try{ const v = localStorage.getItem('lpp-traiteur-'+id); if(v!==null) return v==='1'; }catch(e){}
+  return (BLOCKS.find(b=>b.id===id)||{}).def !== false;
+}
+function setBlock(id,on){ try{ localStorage.setItem('lpp-traiteur-'+id, on?'1':'0'); }catch(e){} }
+function applyBlockVisibility(){
+  BLOCKS.forEach(b=>{
+    const el = document.getElementById(b.id);
+    if(el) el.classList.toggle('hidden', !blockOn(b.id));
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RENDU
+   ═══════════════════════════════════════════════════════════════════════════ */
+function render(){
+  Object.values(CHARTS).forEach(c=>{ try{c.destroy();}catch(e){} });
+  CHARTS = {};
+  if(!MONTHS.length){
+    document.getElementById('content').innerHTML = '<div class="note">Aucun mois avec des données dans l\'onglet <b>Ventilation CA TTC</b>.</div>';
+    return;
+  }
+  const key = document.getElementById('f-month').value || MONTHS[MONTHS.length-1];
+  const N  = statsOf(key);
+  const N1 = statsOf(prevYearKey(key));
+  const nbHist = +document.getElementById('f-hist').value;
+  CUR_KEY = key; CUR_HIST = nbHist;
+
+  let html = '';
+  if(!N1.exists || !N1.nbJours){
+    html += `<div class="note"><b>Pas de référence N-1 pour ${esc(N.label)}.</b> L'onglet « Ventilation CA TTC » démarre en octobre 2025 : les objectifs et comparatifs N-1 n'apparaissent qu'à partir d'octobre 2026. Les blocs de suivi du mois restent lisibles, les colonnes N-1 affichent « — ».</div>`;
+  }
+  html += blockMagasins(key);
+  html += blockSynthese(N,N1);
+  html += blockJauges(N,N1);
+  html += blockCalendrier(N,N1);
+  html += blockTableau(N,N1);
+  html += blockCumul(N,N1);
+  html += blockBarres(N,N1);
+  html += blockDow(N,N1);
+  html += blockHistorique(key,nbHist);
+  html += blockSitesHtml(N,N1);
+
+  document.getElementById('content').innerHTML = html;
+  applyBlockVisibility();
+
+  SITES.forEach((s,i)=>drawSiteChart(s,i,key,nbHist));
+  drawCumul(N,N1);
+  drawBarres(N,N1);
+  drawDow(N,N1);
+  drawHistorique(key,nbHist);
+  drawSites(N);
+}
+
+/* ═══════════════ ★ · BLOCS PAR MAGASIN (en tête de page) ═══════════════════
+   Même structure que dashboard_moy_jour.html : jauge + métriques à gauche,
+   historique mensuel N vs N-1 à droite. Appliqué à l'activité traiteur
+   (sélecteur « Activité » : Total traiteur / Cuisine / Magasins).
+   ═══════════════════════════════════════════════════════════════════════════ */
+function blockMagasins(key){
+  const moisCourt = monthLabel(key).split(' ')[0];
+  let html = `<div id="bmag">
+    <div class="mag-sep"><span>Par magasin — ${esc(scopeLabel(SCOPE))}</span><i></i></div>`;
+  SITES.forEach((site,i)=>{ html += siteBlock(site,i,key,moisCourt); });
+  html += `</div>`;
+  return html;
+}
+
+function siteBlock(site,idx,key,moisCourt){
+  const color = SITE_COLORS[site];
+  const N  = statsOfSite(key, idx);
+  const N1 = statsOfSite(prevYearKey(key), idx);
+
+  const real  = pick(N, SCOPE);
+  const moyN1 = N1.nbJours ? pickMoy(N1, SCOPE) : null;
+  const moyN  = N.nbJours ? real/N.nbJours : null;
+  const obj   = moyN1!==null ? moyN1*N.nbJours : null;
+  const pct   = (obj && obj>0) ? real/obj*100 : null;
+  const ecart = obj!==null ? real-obj : null;
+  const ecartCls = (ecart===null||!obj) ? '' : (ecart>=0?'ecart-pos':'ecart-neg');
+  const ecartStr = ecart===null ? '—'
+    : (ecart>=0?'▲ +':'▼ ') + fmt0(Math.abs(ecart)) + ' €'
+      + (obj>0 ? ' ('+(ecart>=0?'+':'')+((ecart/obj)*100).toFixed(1).replace('.',',')+' %)' : '');
+
+  const jp        = joursPrevus(key);
+  const restants  = jp!==null ? jp-N.nbJours : null;
+  const objFin    = (moyN1!==null && jp!==null) ? moyN1*jp : null;
+  const manquant  = objFin!==null ? objFin-real : null;
+  const caJour    = (manquant!==null && restants!==null && restants>0) ? manquant/restants : null;
+
+  let proj;
+  if(caJour!==null)        proj = `<div class="proj-value">${fmtE(caJour)}</div>
+                                   <div class="proj-sub">${restants} jour${restants>1?'s':''} restant${restants>1?'s':''} · objectif fin de mois : ${fmtE(objFin)}</div>`;
+  else if(jp===null)       proj = `<div class="proj-missing">Renseigner l'onglet Calendrier<br/>pour ce mois</div>`;
+  else if(moyN1===null)    proj = `<div class="proj-missing">Pas de référence N-1</div>`;
+  else if(restants<=0)     proj = `<div class="proj-value" style="font-size:16px">Mois terminé</div>
+                                   <div class="proj-sub">Objectif fin de mois : ${fmtE(objFin)}</div>`;
+  else                     proj = `<div class="proj-missing">Données insuffisantes</div>`;
+
+  return `
+  <div class="block">
+    <div class="site-head">
+      <div class="site-name"><span class="dot" style="background:${color}"></span>${esc(SITE_NAMES[site])}</div>
+      <div class="site-meta">
+        <span>Mois : <strong>${esc(monthLabel(key))}</strong></span>
+        <span class="days-badge" style="background:${color}">📅 ${N.nbJours} jour${N.nbJours>1?'s':''} travaillé${N.nbJours>1?'s':''} (N)</span>
+        ${N1.nbJours
+          ? `<span style="background:${color}33;color:${color};padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">${N1.nbJours}j N-1</span>`
+          : `<span style="color:#B4BFD4;font-size:11px">N-1 non disponible</span>`}
+      </div>
+    </div>
+    <div class="site-body">
+      <div class="gauge-panel">
+        <div class="gauge-title">Avancement ${esc(moisCourt)}</div>
+        ${makeGaugeSVG(pct)}
+        <div class="metric-grid">
+          <div class="metric-item"><div class="metric-label">Moy/j N-1 ${tip('CA traiteur du magasin sur le même mois N-1 ÷ ses jours travaillés N-1')}</div><div class="metric-value">${fmtE(moyN1)}</div></div>
+          <div class="metric-item"><div class="metric-label">Moy/j N ${tip('CA traiteur du magasin sur le mois ÷ ses jours travaillés N')}</div><div class="metric-value">${fmtE(moyN)}</div></div>
+          <div class="metric-item" style="background:${color}18;border:1.5px solid ${color}44">
+            <div class="metric-label" style="color:${color}">Objectif N ${tip('Moy/j N-1 × nb jours travaillés N — objectif glissant, identique aux dashboards magasins')}</div>
+            <div class="metric-value" style="color:${color}">${fmtE(obj)}</div></div>
+          <div class="metric-item"><div class="metric-label">CA réel N ${tip('CA traiteur TTC réalisé par ce magasin sur le mois')}</div><div class="metric-value">${fmtE(real)}</div></div>
+          <div class="metric-item full ${ecartCls}">
+            <div class="metric-label">Écart vs objectif ${tip('CA réel N − Objectif N, en € et en %')}</div>
+            <div class="metric-value">${ecartStr}</div></div>
+        </div>
+        <div class="projection-block">
+          <div class="proj-label">CA/j à réaliser ${tip('(Objectif fin de mois − CA réel N) ÷ jours restants. Objectif fin de mois = Moy/j N-1 × jours prévus (onglet Calendrier).')}</div>
+          ${proj}
+        </div>
+      </div>
+      <div class="chart-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <div style="font-size:11px;color:var(--text-light)">Survoler pour détail jours + moy/jour</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <div style="display:flex;gap:3px;">
+              <button id="bt-type-bar-${site}"  class="toggle-btn${siteChartType[site]==='bar'?' active':''}"  onclick="setSiteType('${site}','bar')">&#9646; Barres</button>
+              <button id="bt-type-line-${site}" class="toggle-btn${siteChartType[site]==='line'?' active':''}" onclick="setSiteType('${site}','line')">&#8725; Courbes</button>
+            </div>
+            <div style="width:1px;height:22px;background:var(--border)"></div>
+            <div style="display:flex;gap:3px;">
+              <button id="bt-met-ca-${site}"  class="toggle-btn${siteChartMetric[site]==='ca'?' active':''}"  onclick="setSiteMetric('${site}','ca')">CA total</button>
+              <button id="bt-met-moy-${site}" class="toggle-btn${siteChartMetric[site]==='moy'?' active':''}" onclick="setSiteMetric('${site}','moy')">Moy/jour</button>
+            </div>
+          </div>
+        </div>
+        <div style="position:relative;height:250px"><canvas id="mchart-${site}"></canvas></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function setSiteType(site,t){
+  siteChartType[site]=t;
+  ['bar','line'].forEach(x=>{const b=document.getElementById('bt-type-'+x+'-'+site); if(b) b.classList.toggle('active',x===t);});
+  const i=SITES.indexOf(site);
+  if(CHARTS['m'+site]){ try{CHARTS['m'+site].destroy();}catch(e){} delete CHARTS['m'+site]; }
+  drawSiteChart(site,i,CUR_KEY,CUR_HIST);
+}
+function setSiteMetric(site,m){
+  siteChartMetric[site]=m;
+  ['ca','moy'].forEach(x=>{const b=document.getElementById('bt-met-'+x+'-'+site); if(b) b.classList.toggle('active',x===m);});
+  const i=SITES.indexOf(site);
+  if(CHARTS['m'+site]){ try{CHARTS['m'+site].destroy();}catch(e){} delete CHARTS['m'+site]; }
+  drawSiteChart(site,i,CUR_KEY,CUR_HIST);
+}
+
+function drawSiteChart(site,idx,key,nb){
+  const el=document.getElementById('mchart-'+site); if(!el) return;
+  const color=SITE_COLORS[site];
+  const isLine = siteChartType[site]==='line';
+  const isMoy  = siteChartMetric[site]==='moy';
+
+  const iCur = MONTHS.indexOf(key);
+  const upTo = iCur<0 ? MONTHS.length-1 : iCur;
+  const start = nb>=99 ? 0 : Math.max(0, upTo-nb+1);
+  const keys = MONTHS.slice(start, upTo+1);
+
+  const labels=[], dN=[], dN1=[], metaN=[], metaN1=[];
+  const mShort=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+  keys.forEach(k=>{
+    const [yy,mm]=k.split('-');
+    labels.push(mShort[+mm-1]+" '"+yy.slice(2));
+    const a=statsOfSite(k,idx), b=statsOfSite(prevYearKey(k),idx);
+    metaN.push(a); metaN1.push(b);
+    dN.push(  a.nbJours ? Math.round(isMoy ? pick(a,SCOPE)/a.nbJours : pick(a,SCOPE)) : null);
+    dN1.push( b.nbJours ? Math.round(isMoy ? pick(b,SCOPE)/b.nbJours : pick(b,SCOPE)) : null);
+  });
+
+  const labelN1 = isMoy ? 'N-1 moy/jour (réf.)' : 'N-1 CA total (réf.)';
+  const labelN  = isMoy ? 'N moy/jour (réel)'   : 'N CA total (réel)';
+  const base = {spanGaps:true, borderRadius:isLine?0:4, borderSkipped:false};
+
+  const ds1 = isLine
+    ? {...base, label:labelN1, data:dN1, borderColor:color+'88', backgroundColor:color+'18', borderWidth:2, borderDash:[5,4], fill:false, tension:.35, pointRadius:3, pointBorderColor:color+'88', pointBackgroundColor:'#fff'}
+    : {...base, label:labelN1, data:dN1, backgroundColor:color+'44', borderColor:color+'70', borderWidth:1};
+  const ds2 = isLine
+    ? {...base, label:labelN,  data:dN,  borderColor:color, backgroundColor:color+'22', borderWidth:2.5, fill:false, tension:.35, pointRadius:4, pointBackgroundColor:color}
+    : {...base, label:labelN,  data:dN,  backgroundColor:color+'CC', borderColor:color, borderWidth:1.5};
+
+  const pctPlugin = {
+    id:'pctLabels-'+site,
+    afterDatasetsDraw(chart){
+      const {ctx, scales:{y}} = chart;
+      const ds = chart.data.datasets[1];
+      ctx.save();
+      ctx.font='700 10px Inter, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ds.data.forEach((vN,i)=>{
+        const vN1 = chart.data.datasets[0].data[i];
+        if(vN===null||vN1===null||vN1===0) return;
+        const p = (vN-vN1)/vN1*100;
+        const label = (p>=0?'+':'')+p.toFixed(1)+'%';
+        const bg = p>=2 ? '#28A745' : p<=-2 ? '#E05A4A' : '#E8A020';
+        const meta = chart.getDatasetMeta(1), elm = meta.data[i];
+        if(!elm) return;
+        const px = elm.x;
+        const py = isLine ? elm.y-6 : y.getPixelForValue(Math.max(vN,vN1))-6;
+        const tw = ctx.measureText(label).width+8, th=14;
+        ctx.fillStyle=bg; ctx.beginPath();
+        if(ctx.roundRect) ctx.roundRect(px-tw/2, py-th, tw, th, 3); else ctx.rect(px-tw/2, py-th, tw, th);
+        ctx.fill();
+        ctx.fillStyle='#fff'; ctx.fillText(label, px, py-1);
+      });
+      ctx.restore();
+    }
+  };
+
+  CHARTS['m'+site] = new Chart(el,{
+    type: isLine?'line':'bar',
+    data:{labels, datasets:[ds1, ds2]},
+    plugins:[pctPlugin],
+    options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{position:'top', labels:{font:{family:'Inter',size:11}, padding:12, boxWidth:14, useBorderRadius:true, borderRadius:3}},
+        tooltip:{callbacks:{label(c){
+          const isN = c.datasetIndex===1;
+          const row = isN ? metaN[c.dataIndex] : metaN1[c.dataIndex];
+          if(!row || !row.nbJours || c.raw===null) return ` ${c.dataset.label} : N/A`;
+          const ca = pick(row,SCOPE), j = row.nbJours;
+          const lines = [
+            ` ${c.dataset.label} : ${fmt0(c.raw)} €${isMoy?'/j':''}`,
+            ` CA traiteur : ${fmt0(ca)} €`,
+            ` Jours travaillés : ${j}`,
+            ` Moy/jour : ${fmt0(ca/j)} €/j`
+          ];
+          if(isN){
+            const p = metaN1[c.dataIndex];
+            if(p && p.nbJours){
+              const o = Math.round(pick(p,SCOPE)/p.nbJours*j), diff = ca-o;
+              lines.push(` Objectif : ${fmt0(o)} € | Écart : ${diff>=0?'+':''}${fmt0(diff)} €`);
+            }
+          }
+          return lines;
+        }}}
+      },
+      scales:{x:{grid:{display:false}, ticks:{font:{family:'Inter',size:10}}},
+              y:{beginAtZero:true, ticks:{font:{family:'Inter',size:10}, callback:v=>isMoy?fmt0(v)+' €/j':fmtK(v)}, grid:{color:'#E8EDF8'}}}}
+  });
+}
+
+/* ─────────────────────────────── A · Synthèse ──────────────────────────── */
+function blockSynthese(N,N1){
+  const evo = (a,b)=> (b&&b>0) ? (a-b)/b*100 : null;
+  const partTraiteur = N.grand>0 ? N.total/N.grand*100 : null;
+  const best = N.saisis.slice().sort((a,b)=>b.total-a.total)[0];
+  const jp = joursPrevus(N.key);
+  return `
+  <div class="block" id="b0">
+    <div class="block-head">
+      <div><div class="block-title"><span class="block-tag">Bloc A</span> Synthèse ${esc(N.label)}</div>
+        <div class="block-sub">${N.nbJours} jour(s) saisi(s)${jp?` sur ${jp} prévus (onglet Calendrier)`:''} · ${N.nbJoursTraiteur} jour(s) avec du traiteur</div></div>
+    </div>
+    <div class="block-body">
+      <div class="kpi-grid">
+        <div class="kpi c">
+          <div class="kpi-label">Traiteur cuisine ${tip('Colonne S de l\'onglet Ventilation CA TTC — total des 5 magasins, TTC')}</div>
+          <div class="kpi-value" style="color:var(--cuisine)">${fmtE(N.cuisine)}</div>
+          <div class="kpi-sub">N-1 : ${fmtE(N1.nbJours?N1.cuisine:null)} ${pill(evo(N.cuisine,N1.cuisine))}</div>
+        </div>
+        <div class="kpi m">
+          <div class="kpi-label">Traiteur magasins ${tip('Colonne Y de l\'onglet Ventilation CA TTC — total des 5 magasins, TTC')}</div>
+          <div class="kpi-value" style="color:var(--magasin)">${fmtE(N.magasin)}</div>
+          <div class="kpi-sub">N-1 : ${fmtE(N1.nbJours?N1.magasin:null)} ${pill(evo(N.magasin,N1.magasin))}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Total traiteur ${tip('Traiteur cuisine + Traiteur magasins')}</div>
+          <div class="kpi-value" style="color:var(--total)">${fmtE(N.total)}</div>
+          <div class="kpi-sub">N-1 : ${fmtE(N1.nbJours?N1.total:null)} ${pill(evo(N.total,N1.total))}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Moyenne / jour ${tip('Total traiteur ÷ nombre de jours saisis dans le mois')}</div>
+          <div class="kpi-value">${fmtE(N.moyTotal)}</div>
+          <div class="kpi-sub">N-1 : ${fmtE(N1.moyTotal)} ${pill(evo(N.moyTotal,N1.moyTotal))}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Meilleur jour ${tip('Jour du mois avec le plus gros total traiteur')}</div>
+          <div class="kpi-value">${best?fmtE(best.total):'—'}</div>
+          <div class="kpi-sub">${best?`${DOW_LONG[best.dow]} ${best.d} ${MOIS_NOM[best.m-1].toLowerCase()}`:'—'}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Part du traiteur ${tip('Total traiteur ÷ TOTAL GÉNÉRAL du mois (colonne AL) — poids du traiteur dans le CA TTC')}</div>
+          <div class="kpi-value">${partTraiteur===null?'—':fmt1(partTraiteur)+' %'}</div>
+          <div class="kpi-sub">du CA TTC du mois (${fmtK(N.grand)})</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ─────────────────────────────── B · Jauges ────────────────────────────── */
+function gaugeCard(title,color,real,moyN1,nbJours,jp,tipTitle){
+  const obj   = (moyN1!==null) ? moyN1*nbJours : null;
+  const pct   = (obj && obj>0) ? real/obj*100 : null;
+  const ecart = (obj!==null) ? real-obj : null;
+  const ecartP= (obj && obj>0) ? ecart/obj*100 : null;
+  const moyN  = nbJours ? real/nbJours : null;
+
+  const objFin = (moyN1!==null && jp) ? moyN1*jp : null;
+  const manque = objFin!==null ? objFin-real : null;
+  const restants = jp!==null ? jp-nbJours : null;
+  let proj;
+  if(objFin===null)            proj = `<div class="proj-missing">${jp?'Pas de référence N-1':'Renseigner l\'onglet Calendrier'}</div>`;
+  else if(restants===null)     proj = `<div class="proj-missing">Renseigner l'onglet Calendrier</div>`;
+  else if(restants<=0)         proj = `<div class="proj-value">Mois terminé</div><div class="proj-sub">Objectif fin de mois : ${fmtE(objFin)}</div>`;
+  else                         proj = `<div class="proj-value">${fmtE(manque/restants)}</div>
+                                       <div class="proj-sub">Objectif fin de mois ${fmtE(objFin)} · reste ${fmtE(manque)} sur ${restants} jour(s)</div>`;
+
+  return `
+  <div class="gauge-card">
+    <h3><span class="dot" style="background:${color}"></span>${esc(title)} ${tip(tipTitle)}</h3>
+    ${makeGaugeSVG(pct)}
+    <div class="metric-grid">
+      <div class="metric-item"><div class="metric-label">Moy/j N-1 ${tip('CA traiteur du même mois N-1 ÷ jours saisis N-1')}</div><div class="metric-value">${fmtE(moyN1)}</div></div>
+      <div class="metric-item"><div class="metric-label">Moy/j N ${tip('CA traiteur du mois ÷ jours saisis N')}</div><div class="metric-value">${fmtE(moyN)}</div></div>
+      <div class="metric-item" style="border:1.5px solid ${color}"><div class="metric-label">Objectif N ${tip('Moy/j N-1 × nb jours saisis N — objectif glissant, identique à la logique des dashboards magasins')}</div><div class="metric-value">${fmtE(obj)}</div></div>
+      <div class="metric-item"><div class="metric-label">CA réel N</div><div class="metric-value">${fmtE(real)}</div></div>
+      <div class="metric-item full ${ecart===null?'':(ecart>=0?'ecart-pos':'ecart-neg')}">
+        <div class="metric-label">Écart vs objectif</div>
+        <div class="metric-value">${ecart===null?'—':fmtE(ecart)+'  ('+fmtPct(ecartP)+')'}</div>
+      </div>
+    </div>
+    <div class="projection-block">
+      <div class="proj-label">CA/j à réaliser ${tip('(Objectif fin de mois − CA réel) ÷ jours restants. Objectif fin de mois = moy/j N-1 × jours prévus au Calendrier')}</div>
+      ${proj}
+    </div>
+  </div>`;
+}
+
+function blockJauges(N,N1){
+  const jp = joursPrevus(N.key);
+  return `
+  <div class="block" id="b1">
+    <div class="block-head">
+      <div><div class="block-title"><span class="block-tag">Bloc B</span> Jauges &amp; objectifs — ${esc(N.label)}</div>
+        <div class="block-sub">Objectif N = moy/jour N-1 × nb jours saisis N · référence : ${esc(N1.label)}${N1.nbJours?` (${N1.nbJours} j)`:' — indisponible'}</div></div>
+    </div>
+    <div class="block-body">
+      <div class="gauge-grid">
+        ${gaugeCard('Traiteur cuisine',C_CUISINE,N.cuisine,N1.nbJours?N1.moyCuisine:null,N.nbJours,jp,'Colonne S — production cuisine')}
+        ${gaugeCard('Traiteur magasins',C_MAGASIN,N.magasin,N1.nbJours?N1.moyMagasin:null,N.nbJours,jp,'Colonne Y — ventes traiteur en magasin')}
+        ${gaugeCard('Total traiteur',C_TOTAL,N.total,N1.nbJours?N1.moyTotal:null,N.nbJours,jp,'Cuisine + magasins')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function makeGaugeSVG(pct){
+  const W=240,H=162, cx=120, cy=118, Ro=96, Ri=64;
+  const START=210, SWEEP=210, Nn=14, GAP=3, MAX=150;
+  const SEG=(SWEEP-(Nn-1)*GAP)/Nn;
+  const COLORS=['#E82010','#EC3818','#EE5018','#F06828','#F28030','#F49C28','#F4B820','#EED020','#D4D020','#AACC28','#7AC038','#48B840','#28A848','#109050'];
+  const GRAY='#DDE0EA';
+  const f=v=>v.toFixed(2);
+  const pt=(deg,r)=>{const rad=deg*Math.PI/180;return [cx+r*Math.cos(rad), cy-r*Math.sin(rad)];};
+  const sector=(a1,a2)=>{
+    const [x1,y1]=pt(a1,Ro),[x2,y2]=pt(a2,Ro),[x3,y3]=pt(a2,Ri),[x4,y4]=pt(a1,Ri);
+    return `M${f(x1)},${f(y1)} A${Ro},${Ro} 0 0,0 ${f(x2)},${f(y2)} L${f(x3)},${f(y3)} A${Ri},${Ri} 0 0,1 ${f(x4)},${f(y4)} Z`;
+  };
+  const filled = (pct===null||pct===undefined) ? 0 : Math.round((Math.min(Math.max(pct,0),MAX)/MAX)*Nn);
+  let segs='';
+  for(let i=0;i<Nn;i++){
+    const a1=START-i*(SEG+GAP), a2=a1-SEG;
+    segs += `<path d="${sector(a1,a2)}" fill="${i<filled?COLORS[i]:GRAY}" stroke="white" stroke-width="1.5"/>`;
+  }
+  const clamp=(pct===null||pct===undefined)?0:Math.min(Math.max(pct,0),MAX);
+  const nd=START-(clamp/MAX)*SWEEP;
+  const [ntx,nty]=pt(nd,Ro-8), [nox,noy]=pt(nd+180,10);
+  const seg100=Math.round((100/MAX)*Nn);
+  const m100=START-seg100*(SEG+GAP)+GAP/2;
+  const [m1x,m1y]=pt(m100,Ri-4), [m2x,m2y]=pt(m100,Ro+4);
+  const display=(pct===null||pct===undefined)?'—':pct.toFixed(1).replace('.',',')+' %';
+  return `<div style="position:relative;text-align:center;width:100%">
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;display:block;margin:0 auto">
+      ${segs}
+      <line x1="${f(m1x)}" y1="${f(m1y)}" x2="${f(m2x)}" y2="${f(m2y)}" stroke="white" stroke-width="2.5" stroke-dasharray="4,3" opacity=".9"/>
+      <line x1="${f(nox)}" y1="${f(noy)}" x2="${f(ntx)}" y2="${f(nty)}" stroke="#1A2440" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="${cx}" cy="${cy}" r="8" fill="#1A2440"/><circle cx="${cx}" cy="${cy}" r="3.5" fill="white"/>
+    </svg>
+    <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%)">
+      <span class="tip-wrap">
+        <span style="display:inline-block;background:#1A2440;color:#fff;font-size:12px;font-weight:800;border-radius:5px;padding:3px 10px">${display}</span>
+        <span class="tip-box" style="width:220px">CA réel N ÷ Objectif N × 100 — 100 % = objectif atteint (repère blanc pointillé)</span>
+      </span>
+    </div>
+  </div>`;
+}
+
+/* ──────────────────────── C · Calendrier du mois ───────────────────────── */
+function blockCalendrier(N,N1){
+  const [y,m] = N.key.split('-').map(Number);
+  const nd = daysInMonth(y,m);
+  const first = (new Date(y,m-1,1).getDay()+6)%7;
+  const refMoy = N1.nbJours ? pickMoy(N1,SCOPE) : null;
+  const byDay = {}; N.days.forEach(d=>byDay[d.d]=d);
+  const byDayN1 = {}; (N1.days||[]).forEach(d=>byDayN1[d.d]=d);
+
+  let cells = '';
+  for(let i=0;i<first;i++) cells += '<div class="cal-cell cal-empty"></div>';
+  for(let d=1; d<=nd; d++){
+    const o = byDay[d];
+    const dt = new Date(y,m-1,d); dt.setHours(0,0,0,0);
+    const isToday = dt.getTime()===TODAY.getTime();
+    const o1 = byDayN1[d];
+    const v  = o ? pick(o,SCOPE) : 0;
+    const v1 = o1 && o1.saisi ? pick(o1,SCOPE) : null;
+    let cls='cal-cell', badge='', val, sub;
+    if(!o || (!o.saisi && dt>TODAY)){
+      cls += ' cal-future'; val='—'; sub='à venir';
+    }else if(!o.saisi){
+      cls += ' cal-closed'; val='—'; sub = isToday ? 'aujourd\'hui · non saisi' : 'fermé / non saisi';
+    }else{
+      const ratio = (refMoy && refMoy>0) ? v/refMoy*100 : null;
+      if(ratio===null)      cls += '';
+      else if(ratio>=100)   cls += ' cal-good';
+      else if(ratio>=70)    cls += ' cal-mid';
+      else                  cls += ' cal-bad';
+      val = fmt0(v)+' €';
+      sub = v1===null ? 'N-1 —' : 'N-1 '+fmt0(v1)+' €';
+      if(ratio!==null) badge = `<span class="cb" style="background:#fff;color:${ratio>=100?'#155724':(ratio>=70?'#8A6410':'#721C24')}">${Math.round(ratio)}%</span>`;
+    }
+    if(isToday) cls += ' cal-today';
+    cells += `<div class="${cls}" title="${DOW_LONG[(dt.getDay()+6)%7]} ${d} ${MOIS_NOM[m-1]} ${y}">
+      ${badge}<span class="cd">${isToday?'▸ ':''}${d}</span>
+      <span class="cv" ${val==='—'?'style="color:#AAB5CC"':`style="color:${scopeColor(SCOPE)}"`}>${val}</span>
+      <span class="cs">${sub}</span></div>`;
+  }
+  return `
+  <div class="block" id="b2">
+    <div class="block-head">
+      <div><div class="block-title"><span class="block-tag">Bloc C</span> Calendrier ${esc(N.label)} — ${esc(scopeLabel(SCOPE))}</div>
+        <div class="block-sub">Couleur = jour comparé à la moyenne/jour N-1 (${refMoy===null?'indisponible':fmtE(refMoy)+'/j'})</div></div>
+    </div>
+    <div class="block-body">
+      <div class="cal-wrap">
+        <div class="cal-grid">${DOW.map(d=>`<div class="cal-dow">${d}</div>`).join('')}</div>
+        <div class="cal-grid">${cells}</div>
+        <div class="cal-legend">
+          <span><span class="sw" style="background:#D4EDDA;border-color:#9BD3A8"></span>≥ 100 % de la moy/j N-1</span>
+          <span><span class="sw" style="background:#FFF3D6;border-color:#F0CF86"></span>70 – 99 %</span>
+          <span><span class="sw" style="background:#F8D7DA;border-color:#EDA8B0"></span>&lt; 70 %</span>
+          <span><span class="sw" style="background:#F4F6FB"></span>fermé / non saisi</span>
+          <span><span class="sw" style="background:#FAFBFE"></span>à venir</span>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ──────────────────────── D · Tableau jour par jour ────────────────────── */
+function blockTableau(N,N1){
+  const [y,m] = N.key.split('-').map(Number);
+  const nd = daysInMonth(y,m);
+  const byDay = {};   N.days.forEach(d=>byDay[d.d]=d);
+  const byDayN1 = {}; (N1.days||[]).forEach(d=>byDayN1[d.d]=d);
+  const moyN1 = N1.nbJours ? pickMoy(N1,SCOPE) : null;
+
+  let cumN=0, cumN1=0, cumObj=0, rows='';
+  for(let d=1; d<=nd; d++){
+    const o=byDay[d], o1=byDayN1[d];
+    const dt=new Date(y,m-1,d); dt.setHours(0,0,0,0);
+    const dow=(dt.getDay()+6)%7;
+    const future = dt>TODAY && !(o&&o.saisi);
+    const saisi = o && o.saisi;
+    if(saisi){
+      cumN += pick(o,SCOPE);
+      if(moyN1!==null) cumObj += moyN1;
+    }
+    if(o1 && o1.saisi) cumN1 += pick(o1,SCOPE);
+
+    const vN  = saisi ? pick(o,SCOPE) : null;
+    const vN1 = (o1&&o1.saisi) ? pick(o1,SCOPE) : null;
+    const evo = (vN!==null && vN1!==null && vN1>0) ? (vN-vN1)/vN1*100 : null;
+    const ecartCum = (moyN1!==null && saisi) ? cumN-cumObj : null;
+
+    const cls = future ? 'future' : (dow>=5 ? 'we' : '');
+    const todayCls = dt.getTime()===TODAY.getTime() ? ' today' : '';
+    rows += `<tr class="${cls}${todayCls}">
+      <td class="l"><b>${d}</b> ${DOW[dow]}</td>
+      <td>${saisi?fmtE(o.cuisine):'—'}</td>
+      <td>${saisi?fmtE(o.magasin):'—'}</td>
+      <td><b>${saisi?fmtE(o.total):'—'}</b></td>
+      <td style="color:#8795AF">${vN1===null?'—':fmtE(vN1)}</td>
+      <td>${vN===null||vN1===null?'<span class="pill na">—</span>':pill(evo)}</td>
+      <td>${saisi?fmtE(cumN):'—'}</td>
+      <td style="color:#8795AF">${cumObj>0&&saisi?fmtE(cumObj):'—'}</td>
+      <td>${ecartCum===null?'—':`<span class="pill ${ecartCum>=0?'up':'down'}">${(ecartCum>=0?'+':'')+fmt0(ecartCum)} €</span>`}</td>
+    </tr>`;
+  }
+  const evoTot = (N1.nbJours && pick(N1,SCOPE)>0) ? (pick(N,SCOPE)-pick(N1,SCOPE))/pick(N1,SCOPE)*100 : null;
+  return `
+  <div class="block" id="b3">
+    <div class="block-head">
+      <div><div class="block-title"><span class="block-tag">Bloc D</span> Jour par jour — ${esc(N.label)}</div>
+        <div class="block-sub">Colonnes N-1 / objectif cumulé calculées sur « ${esc(scopeLabel(SCOPE))} » (sélecteur Activité). Week-ends grisés, jour du jour encadré.</div></div>
+    </div>
+    <div class="block-body">
+      <div class="tbl-scroll">
+      <table>
+        <thead><tr>
+          <th class="l">Jour</th>
+          <th>Cuisine (S)</th>
+          <th>Magasins (Y)</th>
+          <th>Total</th>
+          <th>${esc(scopeLabel(SCOPE))} N-1</th>
+          <th>N vs N-1</th>
+          <th>Cumul N</th>
+          <th>Objectif cumulé</th>
+          <th>Écart cumulé</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr>
+          <td class="l">TOTAL ${N.nbJours} j</td>
+          <td>${fmtE(N.cuisine)}</td>
+          <td>${fmtE(N.magasin)}</td>
+          <td>${fmtE(N.total)}</td>
+          <td style="color:#8795AF">${N1.nbJours?fmtE(pick(N1,SCOPE)):'—'}</td>
+          <td>${pill(evoTot)}</td>
+          <td>${fmtE(pick(N,SCOPE))}</td>
+          <td style="color:#8795AF">${moyN1===null?'—':fmtE(moyN1*N.nbJours)}</td>
+          <td>${moyN1===null?'—':`<span class="pill ${pick(N,SCOPE)-moyN1*N.nbJours>=0?'up':'down'}">${(pick(N,SCOPE)-moyN1*N.nbJours>=0?'+':'')+fmt0(pick(N,SCOPE)-moyN1*N.nbJours)} €</span>`}</td>
+        </tr></tfoot>
+      </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ──────────────────────── E · Course au cumul ──────────────────────────── */
+function blockCumul(N,N1){
+  return `
+  <div class="block" id="b4">
+    <div class="block-head">
+      <div><div class="block-title"><span class="block-tag">Bloc E</span> Course au cumul — ${esc(N.label)} · ${esc(scopeLabel(SCOPE))}</div>
+        <div class="block-sub">Cumul réel N vs cumul N-1 vs objectif cumulé (moy/j N-1 × jours saisis)</div></div>
+    </div>
+    <div class="block-body"><div class="chart-box"><canvas id="cv-cumul"></canvas></div></div>
+  </div>`;
+}
+function drawCumul(N,N1){
+  const el=document.getElementById('cv-cumul'); if(!el) return;
+  const [y,m]=N.key.split('-').map(Number);
+  const nd=daysInMonth(y,m);
+  const byDay={}; N.days.forEach(d=>byDay[d.d]=d);
+  const byDayN1={}; (N1.days||[]).forEach(d=>byDayN1[d.d]=d);
+  const moyN1 = N1.nbJours ? pickMoy(N1,SCOPE) : null;
+
+  const labels=[], sN=[], sN1=[], sObj=[];
+  let cN=0,cN1=0,cObj=0, lastSaisi=0;
+  for(let d=1;d<=nd;d++){
+    labels.push(String(d));
+    const o=byDay[d], o1=byDayN1[d];
+    const dt=new Date(y,m-1,d); dt.setHours(0,0,0,0);
+    if(o&&o.saisi){ cN+=pick(o,SCOPE); if(moyN1!==null) cObj+=moyN1; lastSaisi=d; }
+    if(o1&&o1.saisi) cN1+=pick(o1,SCOPE);
+    sN.push(dt>TODAY?null:cN);
+    sObj.push(moyN1===null?null:(dt>TODAY?null:cObj));
+    sN1.push(N1.nbJours?cN1:null);
+  }
+  // au-delà du dernier jour saisi, on arrête la courbe N
+  for(let i=lastSaisi;i<nd;i++){ sN[i]=null; sObj[i]=null; }
+
+  CHARTS.cumul = new Chart(el,{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Cumul N '+N.label, data:sN, borderColor:scopeColor(SCOPE), backgroundColor:scopeColor(SCOPE)+'22', borderWidth:3, fill:true, tension:.25, pointRadius:2.5, spanGaps:false},
+      {label:'Objectif cumulé (moy/j N-1)', data:sObj, borderColor:'#1A2440', borderWidth:2, borderDash:[6,4], fill:false, tension:0, pointRadius:0},
+      {label:'Cumul N-1 '+N1.label, data:sN1, borderColor:C_REF, backgroundColor:'transparent', borderWidth:2.5, fill:false, tension:.25, pointRadius:0}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:11}}},
+        tooltip:{callbacks:{
+          title:it=>'Jour '+it[0].label,
+          label:c=>c.dataset.label+' : '+(c.parsed.y===null?'—':fmtE(c.parsed.y))}}},
+      scales:{x:{title:{display:true,text:'Jour du mois',font:{size:10}},grid:{display:false}},
+              y:{beginAtZero:true,ticks:{callback:v=>fmtK(v)},grid:{color:'#EEF2F9'}}}}
+  });
+}
+
+/* ──────────────────── F · Barres journalières N vs N-1 ─────────────────── */
+function blockBarres(N,N1){
+  return `
+  <div class="block" id="b5">
+    <div class="block-head">
+      <div><div class="block-title"><span class="block-tag">Bloc F</span> Journalier N vs N-1 — ${esc(N.label)}</div>
+        <div class="block-sub">Cuisine + magasins empilés pour N, barre grise = même jour N-1, ligne = moy/j N-1</div></div>
+    </div>
+    <div class="block-body"><div class="chart-box"><canvas id="cv-bar"></canvas></div></div>
+  </div>`;
+}
+function drawBarres(N,N1){
+  const el=document.getElementById('cv-bar'); if(!el) return;
+  const [y,m]=N.key.split('-').map(Number);
+  const nd=daysInMonth(y,m);
+  const byDay={}; N.days.forEach(d=>byDay[d.d]=d);
+  const byDayN1={}; (N1.days||[]).forEach(d=>byDayN1[d.d]=d);
+  const moyN1 = N1.nbJours ? pickMoy(N1,SCOPE) : null;
+
+  const labels=[], cui=[], mag=[], ref=[], moy=[];
+  for(let d=1;d<=nd;d++){
+    const dt=new Date(y,m-1,d);
+    labels.push(d+' '+DOW[(dt.getDay()+6)%7]);
+    const o=byDay[d], o1=byDayN1[d];
+    const saisi=o&&o.saisi;
+    if(SCOPE==='cuisine'){ cui.push(saisi?o.cuisine:null); mag.push(null); }
+    else if(SCOPE==='magasin'){ cui.push(null); mag.push(saisi?o.magasin:null); }
+    else { cui.push(saisi?o.cuisine:null); mag.push(saisi?o.magasin:null); }
+    ref.push(o1&&o1.saisi?pick(o1,SCOPE):null);
+    moy.push(moyN1);
+  }
+  const ds=[];
+  if(SCOPE!=='magasin') ds.push({label:'Cuisine (S)',data:cui,backgroundColor:C_CUISINE,stack:'n',borderRadius:3,order:2});
+  if(SCOPE!=='cuisine') ds.push({label:'Magasins (Y)',data:mag,backgroundColor:C_MAGASIN,stack:'n',borderRadius:3,order:2});
+  ds.push({label:'Même jour N-1',data:ref,backgroundColor:C_REF,stack:'n1',borderRadius:3,order:3});
+  if(moyN1!==null) ds.push({type:'line',label:'Moy/j N-1',data:moy,borderColor:'#1A2440',borderWidth:2,borderDash:[6,4],pointRadius:0,fill:false,order:1});
+
+  CHARTS.bar = new Chart(el,{
+    type:'bar', data:{labels,datasets:ds},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+' : '+(c.parsed.y===null?'—':fmtE(c.parsed.y))}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9},autoSkip:false,maxRotation:90,minRotation:90}},
+              y:{stacked:true,beginAtZero:true,ticks:{callback:v=>fmtK(v)},grid:{color:'#EEF2F9'}}}}
+  });
+}
+
+/* ──────────────────── G · Profil par jour de semaine ───────────────────── */
+function blockDow(N,N1){
+  return `
+  <div class="block" id="b6">
+    <div class="block-head">
+      <div><div class="block-title"><span class="block-tag">Bloc G</span> Profil par jour de semaine — ${esc(scopeLabel(SCOPE))}</div>
+        <div class="block-sub">Moyenne par jour de semaine (jours saisis uniquement) — ${esc(N.label)} vs ${esc(N1.label)}</div></div>
+    </div>
+    <div class="block-body"><div class="grid2">
+      <div class="chart-box sm"><canvas id="cv-dow"></canvas></div>
+      <div class="tbl-scroll"><table id="tbl-dow"></table></div>
+    </div></div>
+  </div>`;
+}
+function drawDow(N,N1){
+  const el=document.getElementById('cv-dow'); if(!el) return;
+  const agg = st => {
+    const s=Array(7).fill(0), c=Array(7).fill(0);
+    st.saisis.forEach(d=>{ s[d.dow]+=pick(d,SCOPE); c[d.dow]++; });
+    return s.map((v,i)=>c[i]?v/c[i]:null);
+  };
+  const a=agg(N), b=N1.nbJours?agg(N1):Array(7).fill(null);
+  CHARTS.dow = new Chart(el,{
+    type:'bar',
+    data:{labels:DOW_LONG,datasets:[
+      {label:N.label,data:a,backgroundColor:scopeColor(SCOPE),borderRadius:4},
+      {label:N1.label,data:b,backgroundColor:C_REF,borderRadius:4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+' : '+(c.parsed.y===null?'—':fmtE(c.parsed.y))}}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:10}}},
+              y:{beginAtZero:true,ticks:{callback:v=>fmtK(v)},grid:{color:'#EEF2F9'}}}}
+  });
+  const tb=document.getElementById('tbl-dow');
+  if(tb){
+    let rows='';
+    for(let i=0;i<7;i++){
+      const evo=(a[i]!==null&&b[i]!==null&&b[i]>0)?(a[i]-b[i])/b[i]*100:null;
+      const nb=N.saisis.filter(d=>d.dow===i).length;
+      rows+=`<tr><td class="l">${DOW_LONG[i]}</td><td>${nb}</td><td>${fmtE(a[i])}</td><td style="color:#8795AF">${fmtE(b[i])}</td><td>${pill(evo)}</td></tr>`;
+    }
+    tb.innerHTML=`<thead><tr><th class="l">Jour</th><th>Nb j N</th><th>Moy N</th><th>Moy N-1</th><th>Évol.</th></tr></thead><tbody>${rows}</tbody>`;
+  }
+}
+
+/* ──────────────────── H · Historique mensuel ───────────────────────────── */
+function blockHistorique(key,nb){
+  return `
+  <div class="block" id="b7">
+    <div class="block-head">
+      <div><div class="block-title"><span class="block-tag">Bloc H</span> Historique mensuel de l'activité traiteur</div>
+        <div class="block-sub">Cuisine (col. S) + Magasins (col. Y) empilés · ligne pointillée = total traiteur du même mois N-1</div></div>
+    </div>
+    <div class="block-body">
+      <div class="chart-box"><canvas id="cv-hist"></canvas></div>
+      <div class="tbl-scroll" style="margin-top:16px"><table id="tbl-hist"></table></div>
+    </div>
+  </div>`;
+}
+function drawHistorique(key,nb){
+  const el=document.getElementById('cv-hist'); if(!el) return;
+  const idx = MONTHS.indexOf(key);
+  const upTo = idx<0 ? MONTHS.length-1 : idx;
+  const start = nb>=99 ? 0 : Math.max(0, upTo-nb+1);
+  const keys = MONTHS.slice(start, upTo+1);
+
+  const labels=[], cui=[], mag=[], ref=[], stats=[];
+  keys.forEach(k=>{
+    const s=statsOf(k), p=statsOf(prevYearKey(k));
+    const [yy,mm]=k.split('-');
+    labels.push(MOIS_NOM[+mm-1].slice(0,3)+' '+yy.slice(2));
+    cui.push(s.cuisine); mag.push(s.magasin);
+    ref.push(p.nbJours?p.total:null);
+    stats.push({k,s,p});
+  });
+
+  CHARTS.hist = new Chart(el,{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Traiteur cuisine (S)',data:cui,backgroundColor:C_CUISINE,stack:'n',borderRadius:3,order:2},
+      {label:'Traiteur magasins (Y)',data:mag,backgroundColor:C_MAGASIN,stack:'n',borderRadius:3,order:2},
+      {type:'line',label:'Total traiteur N-1',data:ref,borderColor:'#7C8DAE',borderWidth:2,borderDash:[6,4],pointRadius:2.5,pointBackgroundColor:'#7C8DAE',fill:false,order:1}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:11}}},
+        tooltip:{callbacks:{
+          label:c=>c.dataset.label+' : '+(c.parsed.y===null?'—':fmtE(c.parsed.y)),
+          afterBody:it=>{
+            const o=stats[it[0].dataIndex]; if(!o) return '';
+            const out=['','Total traiteur : '+fmtE(o.s.total),'Jours saisis : '+o.s.nbJours,'Moy/jour : '+fmtE(o.s.moyTotal)];
+            if(o.p.nbJours) out.push('N vs N-1 : '+fmtPct((o.s.total-o.p.total)/o.p.total*100));
+            return out;
+          }}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:10}}},
+              y:{stacked:true,beginAtZero:true,ticks:{callback:v=>fmtK(v)},grid:{color:'#EEF2F9'}}}}
+  });
+
+  const tb=document.getElementById('tbl-hist');
+  if(tb){
+    const max=Math.max(...stats.map(o=>o.s.total),1);
+    let rows='';
+    stats.slice().reverse().forEach(o=>{
+      const evo=o.p.nbJours&&o.p.total>0?(o.s.total-o.p.total)/o.p.total*100:null;
+      const part=o.s.grand>0?o.s.total/o.s.grand*100:null;
+      rows+=`<tr>
+        <td class="l">${monthLabel(o.k)}</td>
+        <td>${o.s.nbJours}</td>
+        <td style="color:${C_CUISINE};font-weight:700">${fmtE(o.s.cuisine)}</td>
+        <td style="color:${C_MAGASIN};font-weight:700">${fmtE(o.s.magasin)}</td>
+        <td><b>${fmtE(o.s.total)}</b></td>
+        <td class="bar-cell"><div class="bar-bg" style="width:${(o.s.total/max*100).toFixed(1)}%;background:${C_TOTAL}"></div><span style="position:relative">${fmtE(o.s.moyTotal)}</span></td>
+        <td style="color:#8795AF">${o.p.nbJours?fmtE(o.p.total):'—'}</td>
+        <td>${pill(evo)}</td>
+        <td>${part===null?'—':fmt1(part)+' %'}</td>
+      </tr>`;
+    });
+    tb.innerHTML=`<thead><tr><th class="l">Mois</th><th>Jours</th><th>Cuisine (S)</th><th>Magasins (Y)</th><th>Total</th><th>Moy/jour</th><th>Total N-1</th><th>Évol.</th><th>Part CA TTC</th></tr></thead><tbody>${rows}</tbody>`;
+  }
+}
+
+/* ──────────────────── I · Détail par magasin ───────────────────────────── */
+function blockSitesHtml(N,N1){
+  return `
+  <div class="block" id="b8">
+    <div class="block-head">
+      <div><div class="block-title"><span class="block-tag">Bloc I</span> Détail par magasin — ${esc(N.label)}</div>
+        <div class="block-sub">Colonnes N→R (cuisine) et T→X (magasins) de l'onglet Ventilation CA TTC — bonus hors demande initiale</div></div>
+    </div>
+    <div class="block-body">
+      <div class="grid-donut">
+        <div><div class="chart-box sm"><canvas id="cv-dn-c"></canvas></div><div style="text-align:center;font-size:11px;font-weight:700;color:var(--cuisine);margin-top:6px">Traiteur cuisine</div></div>
+        <div><div class="chart-box sm"><canvas id="cv-dn-m"></canvas></div><div style="text-align:center;font-size:11px;font-weight:700;color:var(--magasin);margin-top:6px">Traiteur magasins</div></div>
+        <div class="tbl-scroll"><table id="tbl-sites"></table></div>
+      </div>
+    </div>
+  </div>`;
+}
+function drawSites(N){
+  const sumC=Array(5).fill(0), sumM=Array(5).fill(0);
+  N.saisis.forEach(d=>{
+    for(let i=0;i<5;i++){ sumC[i]+=nz(d.cSites[i]); sumM[i]+=nz(d.mSites[i]); }
+  });
+  const colors=SITES.map(s=>SITE_COLORS[s]);
+  const mk=(id,data)=>{
+    const el=document.getElementById(id); if(!el) return;
+    const tot=data.reduce((a,b)=>a+b,0);
+    CHARTS[id]=new Chart(el,{
+      type:'doughnut',
+      data:{labels:SITES.map(s=>SITE_NAMES[s]),datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
+        plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:10}}},
+          tooltip:{callbacks:{label:c=>c.label+' : '+fmtE(c.parsed)+(tot>0?' ('+(c.parsed/tot*100).toFixed(1).replace('.',',')+' %)':'')}}}}
+    });
+  };
+  mk('cv-dn-c',sumC); mk('cv-dn-m',sumM);
+  const tb=document.getElementById('tbl-sites');
+  if(tb){
+    let rows='';
+    SITES.forEach((s,i)=>{
+      const t=sumC[i]+sumM[i];
+      rows+=`<tr><td class="l"><span class="dot" style="background:${SITE_COLORS[s]};display:inline-block;margin-right:6px;vertical-align:-1px"></span>${SITE_NAMES[s]}</td>
+        <td style="color:${C_CUISINE}">${fmtE(sumC[i])}</td><td style="color:${C_MAGASIN}">${fmtE(sumM[i])}</td><td><b>${fmtE(t)}</b></td></tr>`;
+    });
+    tb.innerHTML=`<thead><tr><th class="l">Magasin</th><th>Cuisine</th><th>Magasins</th><th>Total</th></tr></thead><tbody>${rows}</tbody>
+      <tfoot><tr><td class="l">TOTAL</td><td>${fmtE(sumC.reduce((a,b)=>a+b,0))}</td><td>${fmtE(sumM.reduce((a,b)=>a+b,0))}</td><td>${fmtE(sumC.concat(sumM).reduce((a,b)=>a+b,0))}</td></tr></tfoot>`;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+buildBlocksBar();
+loadData();
+</script>
+</body>
+</html>
